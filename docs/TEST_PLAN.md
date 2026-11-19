@@ -1,6 +1,15 @@
 # Acceptance and validation plan
 
-Record Blender version, extension version/commit, input/keymap setup, exact actions, expected behavior, actual behavior, and screenshots/video when useful. UI tests remain pending until performed in Blender; no code is implemented in this starter.
+Record Blender version, extension version/commit, input/keymap setup, exact actions, expected behavior, actual behavior, and screenshots/video when useful.
+
+## Foundation gate
+
+For SM-001, run the background installation and registration smoke test and complete the viewport check in [Build and test](BUILD.md). Record the background and visual results separately.
+
+SM-001 passed on Blender 5.2.4 LTS for Windows with Spline Maker 0.1.0.
+
+- Background: The ZIP installed in an isolated profile. Enable, disable, and re-enable passed, including registration cleanup and a single Add → Curve menu callback after re-enable.
+- Viewport: The owner confirmed the menu entry and sidebar panel, the status message without object creation, and that both entries disappeared on disable and returned once on re-enable.
 
 ## Drawing gate
 

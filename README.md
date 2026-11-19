@@ -2,7 +2,7 @@
 
 Planning starter for a Blender extension inspired by the direct spline modeling workflow of 3ds Max. Working title: **Spline Maker**. Suggested GitHub repository: `blender-spline-maker`.
 
-**Status:** specification and development backlog only. No working extension is included.
+**Status:** SM-001 provides an installable local test build. It adds the Draw Spline menu action and sidebar panel with a status message. Drawing is planned for M1.
 
 Primary test target: Blender 5.2.4 LTS on Windows. Compatibility beyond that version is unverified.
 
@@ -27,6 +27,9 @@ Shortcuts supplement visible controls. They must be scoped to Spline Maker tools
 
 ## Project files
 
+- `extension/spline_maker/`: extension manifest, registration, and viewport entry points.
+- `tests/blender/smoke_registration.py`: background installation and registration smoke test.
+- `docs/BUILD.md`: build, install, and verification instructions.
 - `docs/ROADMAP.md`: milestones, issue-sized tasks, and release gates.
 - `docs/INTERACTION_SPEC.md`: behavior contract and decisions to validate.
 - `docs/ARCHITECTURE.md`: proposed implementation and technical risks.

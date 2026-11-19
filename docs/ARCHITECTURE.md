@@ -6,7 +6,9 @@ Use native Blender Bézier curve data as persistent source geometry. Implement c
 
 Keep document state (source curves and relevant settings) separate from transient interaction state (hover target, live preview, drag start, drawing plane during creation). Native curve data must remain usable if the add-on is disabled.
 
-## Proposed source layout (not yet implemented)
+## Source layout
+
+SM-001 implements the extension entry point, manifest, viewport UI, and background smoke test. The remaining paths below are proposed.
 
 | Path | Responsibility |
 | --- | --- |

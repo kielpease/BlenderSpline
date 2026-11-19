@@ -1,0 +1,13 @@
+schema_version = "1.0.0"
+id = "spline_maker"
+version = "0.1.0"
+name = "Spline Maker"
+tagline = "Draw and edit splines in the 3D Viewport"
+maintainer = "Spline Maker Project"
+type = "add-on"
+blender_version_min = "5.2.4"
+# Required by Blender for local packaging. Replace once the owner selects a license.
+license = ["License pending (local testing only)"]
+
+[build]
+paths = ["__init__.py", "ui.py"]
