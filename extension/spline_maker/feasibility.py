@@ -47,7 +47,8 @@ def selected_handles(context):
         (point, side)
         for point in editable_bezier_points(context)
         for side in ("left", "right")
-        if getattr(point, f"handle_{side}_type") in {"FREE", "VECTOR"}
+        if (getattr(point, f"handle_{side}_type") in {"FREE", "VECTOR"}
+            or (point.select_control_point and point.handle_left_type == point.handle_right_type == "ALIGNED"))
         and (point.select_control_point or getattr(point, f"select_{side}_handle"))
     ]
 

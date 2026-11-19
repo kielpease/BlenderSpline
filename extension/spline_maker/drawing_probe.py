@@ -1,4 +1,4 @@
-"""Modal straight-point drawing probe for SM-003."""
+"""Modal corner placement and viewport preview."""
 
 import blf
 import bpy
@@ -6,12 +6,22 @@ import gpu
 from bpy_extras import view3d_utils
 from gpu_extras.batch import batch_for_shader
 
-from .drawing_plane import DrawingPlane, DrawingSession, project_view_point
+from .drawing_plane import (
+    DrawingPlane, DrawingSession, PointPlacement, SplinePoint, project_view_point, segment_preview,
+)
 
 
 _active = None
 _exit_binding = None
 _BUTTONS = (("Finish", 84, 160), ("Cancel", 168, 244))
+_COMMITTED_COLOR = (0.25, 0.8, 1.0, 1.0)
+_PREVIEW_COLOR = (0.45, 1.0, 0.78, 1.0)
+
+
+def button_at(pixel):
+    if pixel is not None and 45 <= pixel[1] < 71:
+        return next((label for label, left, right in _BUTTONS if left <= pixel[0] < right), None)
+    return None
 
 
 def is_finish_press(event):
@@ -21,13 +31,19 @@ def is_finish_press(event):
 
 
 def commit_curve(context, session):
-    curve = bpy.data.curves.new("Spline Maker Plane Test", "CURVE")
+    curve = bpy.data.curves.new("Spline Maker Curve", "CURVE")
     curve.dimensions = "3D"
     spline = curve.splines.new("BEZIER")
     spline.bezier_points.add(len(session.points) - 1)
-    for point, coordinate in zip(spline.bezier_points, session.points):
-        point.co = coordinate
-        point.handle_left_type = point.handle_right_type = "VECTOR"
+    for point, placed in zip(spline.bezier_points, session.points):
+        point.co = placed.anchor
+        if placed.tangent is None:
+            point.handle_left_type = point.handle_right_type = "VECTOR"
+        else:
+            point.handle_left_type = point.handle_right_type = "FREE"
+            point.handle_left = placed.anchor - placed.tangent
+            point.handle_right = placed.anchor + placed.tangent
+            point.handle_left_type = point.handle_right_type = "ALIGNED"
 
     obj = bpy.data.objects.new(curve.name, curve)
     context.collection.objects.link(obj)
@@ -49,7 +65,7 @@ def stop_active():
 class SPLINE_MAKER_OT_draw_spline(bpy.types.Operator):
     bl_idname = "spline_maker.draw_spline"
     bl_label = "Draw Spline"
-    bl_description = "Test straight-point drawing on the starting view plane"
+    bl_description = "Click to place a corner or drag to pull out Bézier handles"
     bl_options = {"UNDO"}
 
     place_on_invoke: bpy.props.BoolProperty(options={"HIDDEN", "SKIP_SAVE"})
@@ -74,11 +90,10 @@ class SPLINE_MAKER_OT_draw_spline(bpy.types.Operator):
         ))
         self.target = self.context_key(context)
         self.pointer = None
+        self.placement = None
         if self.place_on_invoke:
             pixel = (event.mouse_x - context.region.x, event.mouse_y - context.region.y)
-            point = self.project(context, pixel)
-            if point is not None:
-                self.session.place(point)
+            self.begin_placement(context, pixel)
             self.pointer = pixel
         self.handler = bpy.types.SpaceView3D.draw_handler_add(
             self.draw_overlay, (), "WINDOW", "POST_PIXEL"
@@ -127,6 +142,11 @@ class SPLINE_MAKER_OT_draw_spline(bpy.types.Operator):
             self.session.plane, context.region, context.region_data, pixel
         )
 
+    def begin_placement(self, context, pixel):
+        anchor = self.project(context, pixel)
+        if self.session.can_place(anchor):
+            self.placement = PointPlacement(pixel, anchor)
+
     def modal(self, context, event):
         if (
             _active is not self or self.context_key(context) != self.target
@@ -147,6 +167,18 @@ class SPLINE_MAKER_OT_draw_spline(bpy.types.Operator):
         self.pointer = pixel if inside else None
         context.area.tag_redraw()
 
+        if self.placement is not None:
+            if inside and (event.type in {"MOUSEMOVE", "INBETWEEN_MOUSEMOVE"}
+                           or (event.type == "LEFTMOUSE" and event.value == "RELEASE")):
+                self.placement.update(pixel, self.project(context, pixel))
+            if event.type == "LEFTMOUSE" and event.value == "RELEASE":
+                point = self.placement.point
+                self.session.place(point.anchor, point.tangent)
+                self.placement = None
+                return {"RUNNING_MODAL"}
+            if event.type in {"MOUSEMOVE", "INBETWEEN_MOUSEMOVE"}:
+                return {"RUNNING_MODAL"}
+
         if event.value == "PRESS":
             if event.type == "ESC":
                 self.cleanup()
@@ -154,27 +186,28 @@ class SPLINE_MAKER_OT_draw_spline(bpy.types.Operator):
             # Keep the scene undo stack untouched while preview points exist.
             if event.type == "Z" and event.ctrl and not (event.alt or event.oskey):
                 if not event.shift:
-                    self.session.undo_point()
+                    if self.placement is not None:
+                        self.placement = None
+                    else:
+                        self.session.undo_point()
                 return {"RUNNING_MODAL"}
             if not inside:
                 return {"PASS_THROUGH"}
             # Modified right-clicks must reach Blender, including Industry
             # Compatible's Alt+RMB viewport zoom.
             if is_finish_press(event):
-                return self.finish(context)
+                return self.finish(context) if self.placement is None else {"RUNNING_MODAL"}
             if event.type == "BACK_SPACE":
                 self.session.undo_point()
                 return {"RUNNING_MODAL"}
             if event.type == "LEFTMOUSE" and not (event.alt or event.ctrl or event.oskey):
-                for label, left, right in _BUTTONS:
-                    if left <= pixel[0] < right and 45 <= pixel[1] < 71:
-                        if label == "Finish":
-                            return self.finish(context)
-                        self.cleanup()
-                        return {"CANCELLED"}
-                point = self.project(context, pixel)
-                if point is not None:
-                    self.session.place(point)
+                button = button_at(pixel)
+                if button == "Finish":
+                    return self.finish(context)
+                if button == "Cancel":
+                    self.cleanup()
+                    return {"CANCELLED"}
+                self.begin_placement(context, pixel)
                 return {"RUNNING_MODAL"}
         return {"PASS_THROUGH"}
 
@@ -186,31 +219,65 @@ class SPLINE_MAKER_OT_draw_spline(bpy.types.Operator):
         ):
             return
         plane = self.session.plane
-        points = list(self.session.points)
-        preview = self.project(context, self.pointer) if self.pointer is not None else None
-        if preview is not None:
-            points.append(preview)
+        button = button_at(self.pointer)
+        preview = self.placement.point if self.placement is not None else None
+        unavailable = False
+        if preview is None and self.pointer is not None and button is None:
+            anchor = self.project(context, self.pointer)
+            unavailable = anchor is None
+            if self.session.can_place(anchor):
+                preview = SplinePoint(anchor)
+
+        def project(point):
+            return view3d_utils.location_3d_to_region_2d(
+                context.region, context.region_data, plane.to_world(point)
+            )
+
+        points = self.session.points
         screen = [
-            view3d_utils.location_3d_to_region_2d(context.region, context.region_data, plane.to_world(p))
-            for p in points
+            project(point.anchor) for point in points
         ]
         shader = gpu.shader.from_builtin("UNIFORM_COLOR")
-        segments = [p for a, b in zip(screen, screen[1:]) if a is not None and b is not None for p in (a, b)]
-        draw_batch(shader, "LINES", segments, (0.25, 0.8, 1.0, 1.0))
+        segments = []
+        for start, end in zip(points, points[1:]):
+            segments.extend(visible_lines(project(p) for p in segment_preview(start, end)))
+        draw_batch(shader, "LINES", segments, _COMMITTED_COLOR)
         markers = [
-            xy for p in screen[:len(self.session.points)] if p is not None
+            xy for p in screen if p is not None
             for xy in ((p.x - 4, p.y), (p.x + 4, p.y), (p.x, p.y - 4), (p.x, p.y + 4))
         ]
-        draw_batch(shader, "LINES", markers, (0.25, 0.8, 1.0, 1.0))
+        draw_batch(shader, "LINES", markers, _COMMITTED_COLOR)
+
+        if preview is not None:
+            if points:
+                segment = segment_preview(points[-1], preview)
+                draw_batch(shader, "LINES", visible_lines(project(p) for p in segment), _PREVIEW_COLOR)
+            if preview.tangent is not None:
+                guides = (preview.anchor - preview.tangent, preview.anchor, preview.anchor + preview.tangent)
+                draw_batch(shader, "LINES", visible_lines(project(p) for p in guides), _PREVIEW_COLOR)
+            pixel = project(preview.anchor)
+            if pixel is not None:
+                x, y = pixel
+                diamond = [(x, y + 5), (x + 5, y), (x, y - 5), (x - 5, y), (x, y + 5)]
+                draw_batch(shader, "LINES", visible_lines(diamond), _PREVIEW_COLOR)
 
         for label, left, right in _BUTTONS:
             draw_batch(shader, "TRI_FAN", [(left, 45), (right, 45), (right, 71), (left, 71)],
                        (0.1, 0.15, 0.22, 1.0))
             draw_text(left + 11, 53, label)
-        status = f"{len(self.session.points)} points   |   Click to place   |   Ctrl+Z or Backspace to remove"
-        if self.pointer is not None and preview is None:
+        count = len(self.session.points)
+        if count < 2:
+            status = f"{count} / 2 points needed to finish   |   Click for corner or drag handles"
+        else:
+            status = f"{count} points   |   Click or drag   |   Right-click to finish"
+        if unavailable:
             status = "Placement unavailable. Orbit to face the drawing plane."
         draw_text(84, 81, status)
+
+
+def visible_lines(projected):
+    points = list(projected)
+    return [p for a, b in zip(points, points[1:]) if a is not None and b is not None for p in (a, b)]
 
 
 def draw_batch(shader, kind, coordinates, color):

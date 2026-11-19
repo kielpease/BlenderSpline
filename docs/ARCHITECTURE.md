@@ -54,7 +54,7 @@ Blender 5.2.4 LTS for Windows passed ZIP validation and background checks for to
 
 The probe captures the cursor position and view rotation once. Mouse rays come from the live viewport. Their intersections use the captured plane and get stored in its local XY coordinates. The viewport draws temporary preview geometry with a [SpaceView3D draw handler](https://docs.blender.org/api/5.2/bpy.types.SpaceView3D.html#bpy.types.SpaceView3D.draw_handler_add).
 
-The modal session owns a list of preview points. Ctrl+Z and Backspace remove the latest point from that list. Cancel discards the list and detaches the handler. Finish commits an open native Bézier curve in one Blender undo step. This lets scene undo and redo act on the finished curve as a unit. Navigation events pass through to Blender. The probe tests straight points. Click-drag handles, Shift constraints, and closure are planned for M1.
+The modal session owns a list of preview points. Ctrl+Z and Backspace remove the latest point from that list. Cancel discards the list and detaches the handler. Finish commits an open native Bézier curve in one Blender undo step. This lets scene undo and redo act on the finished curve as a unit. Navigation events pass through to Blender. SM-006 captures an anchor on mouse press and commits on release. Dragging at least five pixels creates equal, opposite handles in the drawing plane. These are saved as native Aligned handles. Shift constraints and closure remain upcoming drawing tasks.
 
 ## Later geometry
 

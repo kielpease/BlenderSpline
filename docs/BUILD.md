@@ -11,10 +11,10 @@ $blender = 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe'
 New-Item -ItemType Directory -Force dist | Out-Null
 & $blender --command extension validate extension/spline_maker
 & $blender --command extension build --source-dir extension/spline_maker --output-dir dist
-& $blender --command extension validate dist/spline_maker-0.4.2.zip
+& $blender --command extension validate dist/spline_maker-0.6.0.zip
 ```
 
-Blender writes the ZIP to `dist/spline_maker-0.4.2.zip` using its [extension packaging commands](https://docs.blender.org/manual/en/5.2/advanced/command_line/extension_arguments.html).
+Blender writes the ZIP to `dist/spline_maker-0.6.0.zip` using its [extension packaging commands](https://docs.blender.org/manual/en/5.2/advanced/command_line/extension_arguments.html).
 
 ## Background smoke test
 
@@ -25,7 +25,7 @@ $previousResources = $env:BLENDER_USER_RESOURCES
 try {
     $testProfile = Join-Path (Resolve-Path dist) ([guid]::NewGuid().ToString())
     $env:BLENDER_USER_RESOURCES = (New-Item -ItemType Directory $testProfile).FullName
-    & $blender --background --factory-startup --python-exit-code 1 --python tests/blender/smoke_registration.py -- dist/spline_maker-0.4.2.zip
+    & $blender --background --factory-startup --python-exit-code 1 --python tests/blender/smoke_registration.py -- dist/spline_maker-0.6.0.zip
 } finally {
     $env:BLENDER_USER_RESOURCES = $previousResources
 }
@@ -66,3 +66,16 @@ When updating, disable **Spline Maker** and restart Blender before installing th
 2. Start separate Draw Spline sessions from **Top**, **Front**, and **Right** orthographic views. Place at least two points and finish each curve. Check that each object's origin is at the 3D cursor and the points are on the expected plane. Top keeps world Z at 3, Front keeps world Y at −2, and Right keeps world X at 4.
 3. Start in an angled perspective view. Place two points, orbit, and place a third. Finish and verify that the curve still faces the starting view. In Edit Mode all points should have local Z equal to zero.
 4. Start again in Top view, place a point, and switch to exact Front view while drawing. The probe should report that placement is unavailable. Return to Top view and confirm you can place the next point.
+
+## SM-005 viewport check
+
+1. Launch **Draw Spline** and move the pointer before clicking. A mint diamond should mark where the first vertex will land. After clicking, the vertex should turn blue and the mint line should follow the next preview. Moving over **Finish** or **Cancel** should hide the mint preview.
+2. Place three corners. Try a second click at the last corner without moving, then move away and finish by right-clicking. The resulting open spline should contain exactly three vertices at the committed locations. Repeat with **Enter** or **Finish**.
+3. Start another curve with a pre-existing object selected. Place two corners, then click **Cancel**. The Outliner, selection, and active object should match their pre-session state. Repeat with **Esc**.
+
+## SM-006 viewport check
+
+1. In **Top** view, choose **Draw Spline** and click two corners. Press and hold the left mouse button at the third point, drag diagonally, and release. The anchor should stay at the press location while the mint tangent guides extend symmetrically. The preview should bend while you drag.
+2. Click a fourth corner and right-click to finish. Check that the first segment is straight and the segments next to the dragged point are curved. In Edit Mode, check that the clicked points have Vector handles and the dragged point has Aligned handles.
+3. Repeat starting with a drag as the first point, including when launched via the toolbar Add flyout. Test a click with slight pointer movement and confirm it still creates a corner. Repeat from an angled view to check that the handles stay in the original drawing plane.
+4. While drawing, place a dragged point, undo it, then add another and cancel. Check that no preview geometry or object remains.

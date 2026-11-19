@@ -1,6 +1,6 @@
 schema_version = "1.0.0"
 id = "spline_maker"
-version = "0.4.2"
+version = "0.6.0"
 name = "Spline Maker"
 tagline = "Draw and edit splines in the 3D Viewport"
 maintainer = "Spline Maker Project"

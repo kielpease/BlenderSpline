@@ -1,7 +1,10 @@
 """View projection and in-progress points for the fixed drawing plane."""
 
+from dataclasses import dataclass
+
 from bpy_extras import view3d_utils
 from mathutils import Vector
+from mathutils.geometry import interpolate_bezier
 
 
 class DrawingPlane:
@@ -33,14 +36,53 @@ def project_view_point(plane, region, view, pixel):
     return plane.intersect(origin, direction, perspective=view.is_perspective)
 
 
+@dataclass
+class SplinePoint:
+    anchor: Vector
+    tangent: Vector | None = None
+
+
+class PointPlacement:
+    def __init__(self, pixel, anchor):
+        self.start_pixel = Vector(pixel)
+        self.point = SplinePoint(anchor.copy())
+        self.dragging = False
+
+    def update(self, pixel, coordinate):
+        if coordinate is None:
+            return
+        self.dragging = self.dragging or (Vector(pixel) - self.start_pixel).length_squared >= 25
+        if self.dragging:
+            offset = coordinate - self.point.anchor
+            self.point.tangent = offset if offset.length_squared > 1e-12 else None
+
+
+def segment_preview(start, end):
+    if start.tangent is None and end.tangent is None:
+        return (start.anchor, end.anchor)
+    chord = (end.anchor - start.anchor) / 3
+    outgoing = start.tangent if start.tangent is not None else chord
+    incoming = end.tangent if end.tangent is not None else chord
+    samples = interpolate_bezier(
+        start.anchor, start.anchor + outgoing, end.anchor - incoming, end.anchor, 20
+    )
+    samples[0], samples[-1] = start.anchor, end.anchor
+    return samples
+
+
 class DrawingSession:
     def __init__(self, plane):
         self.plane = plane
         self.points = []
 
-    def place(self, point):
-        if not self.points or (point - self.points[-1]).length_squared > 1e-12:
-            self.points.append(point.copy())
+    def place(self, anchor, tangent=None):
+        if self.can_place(anchor):
+            self.points.append(SplinePoint(anchor.copy(), tangent.copy() if tangent is not None else None))
+
+    def can_place(self, point):
+        return point is not None and (
+            not self.points or (point - self.points[-1].anchor).length_squared > 1e-12
+        )
 
     def undo_point(self):
         if self.points:

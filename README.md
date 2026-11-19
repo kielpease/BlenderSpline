@@ -2,7 +2,7 @@
 
 Planning starter for a Blender extension inspired by the direct spline modeling workflow of 3ds Max. Working title: **Spline Maker**. Suggested GitHub repository: `blender-spline-maker`.
 
-**Status:** The owner verified the draw-to-edit workflow, the placement crosshair, and fixed-plane drawing across views. In 0.4.2, the toolbar tool places the first vertex on the first viewport click. One right-click finishes the spline and a second returns to Select Box.
+**Status:** The owner verified fixed-plane drawing across views, the two-right-click Finish and Exit sequence, and mixing clicked corners with click-drag Bézier handles in 0.6.0.
 
 Primary test target: Blender 5.2.4 LTS on Windows. Compatibility beyond that version is unverified.
 

@@ -31,6 +31,14 @@ The owner confirmed the crosshair worked in 0.3.3.
 
 The 0.4.0 background test on Blender 5.2.4 LTS for Windows uses Blender's viewport projection helpers with top, front, side, and angled view matrices. It verifies orthographic and perspective placement through an offset 3D cursor and checks that the same world point maps to the same plane coordinate after orbiting. The owner confirmed drawing across different views, first-click placement from the left toolbar in 0.4.1, and the two-right-click Finish and Exit sequence in 0.4.2.
 
+## SM-005 corner placement and preview
+
+The 0.5.0 background checks cover Finish and Cancel hit regions, consecutive duplicate rejection, the two-point minimum, one open Bézier result on Finish, and cancellation leaving the scene and selection unchanged. The owner confirmed the [viewport check](BUILD.md#sm-005-viewport-check), including the corner preview, open spline finish, and cancellation.
+
+## SM-006 click-drag Bézier creation
+
+The 0.6.0 background checks on Blender 5.2.4 LTS for Windows verify the drag threshold, preview curvature, a mixed native Bézier spline, equal and opposite Aligned handles, and Rotate on a selected Aligned anchor. The owner confirmed the [viewport check](BUILD.md#sm-006-viewport-check) for click-drag Bézier creation.
+
 ## Drawing gate
 
 1. Start from Top Orthographic with cursor at a known location. Draw four corners and close. Confirm flat XY geometry and no duplicate endpoint.

@@ -93,7 +93,11 @@ def assert_drawing_probe(probe, editing):
     assert probe.is_finish_press(right_click)
     right_click.alt = True
     assert not probe.is_finish_press(right_click)
+    assert probe.button_at((100, 55)) == "Finish"
+    assert probe.button_at((180, 55)) == "Cancel"
+    assert probe.button_at((165, 55)) is None
     assert_view_projection(probe)
+    assert_mixed_spline(probe)
 
     toolbar = ToolSelectPanelHelper._tool_class_from_space_type("VIEW_3D")
     add_group = next(
@@ -138,22 +142,38 @@ def assert_drawing_probe(probe, editing):
 
     session = probe.DrawingSession(plane)
     before = set(bpy.data.objects)
+    existing_curves = set(bpy.data.curves)
+    selection = set(bpy.context.selected_objects)
+    active_object = bpy.context.view_layer.objects.active
     session.place(point)
+    assert not session.can_place(point)
+    assert not session.can_place(None)
     session.place(point)
-    assert session.points == [point]
+    assert [vertex.anchor for vertex in session.points] == [point]
     session.place(Vector((4, 0, 0)))
     session.undo_point()
-    assert session.points == [point]
+    assert [vertex.anchor for vertex in session.points] == [point]
     session.cancel()
     assert not session.points and set(bpy.data.objects) == before
+    assert set(bpy.data.curves) == existing_curves
+    assert set(bpy.context.selected_objects) == selection
+    assert bpy.context.view_layer.objects.active == active_object
 
     session.place(point)
+    operator = SimpleNamespace(session=session, cleanup=session.cancel, report=lambda *_: None)
+    assert probe.SPLINE_MAKER_OT_draw_spline.finish(operator, bpy.context) == {"RUNNING_MODAL"}
+    assert set(bpy.data.objects) == before
     second = Vector((3, 2, 0))
     session.place(second)
-    obj = probe.commit_curve(bpy.context, session)
+    session.place(second)
+    assert probe.SPLINE_MAKER_OT_draw_spline.finish(operator, bpy.context) == {"FINISHED"}
+    assert not session.points
+    obj = bpy.context.view_layer.objects.active
+    assert set(bpy.data.objects) - before == {obj}
     bpy.context.view_layer.update()
     spline = obj.data.splines[0]
     assert spline.type == "BEZIER"
+    assert not spline.use_cyclic_u
     assert len(spline.bezier_points) == 2
     for control, local in zip(spline.bezier_points, (point, second)):
         assert (obj.matrix_world @ control.co - plane.to_world(local)).length < 1e-5
@@ -181,6 +201,47 @@ def assert_drawing_probe(probe, editing):
             assert bpy.ops.spline_maker.tangent_step() == {"FINISHED"}
             assert (anchor.handle_right - location - rotated * 1.25).length < 1e-5
             assert anchor.co == location
+        finally:
+            bpy.ops.object.mode_set(mode="OBJECT")
+
+
+def assert_mixed_spline(probe):
+    plane = probe.DrawingPlane(Vector((0, 0, 0)), Quaternion())
+    session = probe.DrawingSession(plane)
+    start = Vector((0, 0, 0))
+    anchor = Vector((3, 0, 0))
+    placement = probe.PointPlacement((100, 100), anchor)
+    placement.update((102, 103), anchor + Vector((0.2, 0.3, 0)))
+    assert placement.point.anchor == anchor and placement.point.tangent is None
+    offset = Vector((0.75, 1.5, 0))
+    placement.update((110, 115), anchor + offset)
+    assert placement.point.tangent == offset
+
+    session.place(start)
+    session.place(placement.point.anchor, placement.point.tangent)
+    session.place(Vector((6, 0, 0)))
+    preview = probe.segment_preview(*session.points[:2])
+    assert preview[0] == start and preview[-1] == anchor
+    assert any(abs(point.y) > 0.1 for point in preview[1:-1])
+    obj = probe.commit_curve(bpy.context, session)
+    first, middle, last = obj.data.splines[0].bezier_points
+    assert first.handle_right_type == last.handle_left_type == "VECTOR"
+    assert middle.handle_left_type == middle.handle_right_type == "ALIGNED"
+    assert (middle.handle_left - (anchor - offset)).length < 1e-5
+    assert (middle.handle_right - (anchor + offset)).length < 1e-5
+    area = next(area for area in bpy.context.window.screen.areas if area.type == "VIEW_3D")
+    region = next(region for region in area.regions if region.type == "WINDOW")
+    with bpy.context.temp_override(area=area, region=region):
+        assert bpy.ops.object.mode_set(mode="EDIT") == {"FINISHED"}
+        try:
+            bpy.ops.curve.select_all(action="DESELECT")
+            middle = obj.data.splines[0].bezier_points[1]
+            middle.select_control_point = True
+            assert bpy.ops.wm.tool_set_by_id(name="spline_maker.probe_rotate") == {"FINISHED"}
+            assert bpy.ops.spline_maker.tangent_step() == {"FINISHED"}
+            rotated = Matrix.Rotation(radians(15), 3, "Z") @ offset
+            assert (middle.handle_left - (anchor - rotated)).length < 1e-5
+            assert (middle.handle_right - (anchor + rotated)).length < 1e-5
         finally:
             bpy.ops.object.mode_set(mode="OBJECT")
 
