@@ -29,6 +29,8 @@ Start at level 4 after finishing creation. An object may eventually contain mult
 
 Selection should remain visually clear in Q mode. Shift-click toggles membership; empty-space click deselects; box selection supports vertices first. Preserve component selections when switching transform tools. Define and test how selection converts across levels rather than silently selecting unrelated components.
 
+Owner refinement for 0.10.3: left-drag in empty space box-selects vertices in all four Spline Maker tools, preserving the active tool. Shift-drag adds vertices. A drag beginning on a visible handle diamond directly moves that handle, taking precedence over a selection box. Handle diamonds and guides remain available in each tool while viewport overlays are enabled. A drag beginning on a highlighted gizmo belongs to the gizmo.
+
 ## Tools
 
 Q Select hides transform gizmos; W Move; E Rotate; R Scale. Buttons expose the same actions. Bindings apply only in Spline Maker context. Selecting a tool does not immediately start a mouse transform.
@@ -37,12 +39,14 @@ Proposed transform semantics to validate against the owner's expectations:
 
 - Vertex Move: translate anchor and both handles together.
 - Vertex Rotate/Scale: rotate tangent directions / scale tangent lengths about each selected anchor. Anchor positions remain fixed by default.
-- Handle Move/Rotate/Scale: operate on selected handle relative to its anchor. Linked handles retain intended alignment; independent handles remain independent.
+- Handle editing: directly drag its diamond in the view plane without changing tools. The owning anchor stays fixed. Linked handles preserve alignment and the opposite local length; independent handles leave the opposite handle unchanged. A manual Smooth edit becomes linked Bézier, and a Corner tangent edit becomes independent. Move/Rotate/Scale gizmos and sidebar tangent steps operate on selected anchors; a handle-only selection does not activate them.
 - Segment: transform union of selected segments' endpoint data; shared endpoints only once. Adjacent unselected segments may change shape because they share anchors.
 - Region: transform the full boundary as one unit about selection center.
 - Whole curve: use object transforms where possible; do not bake transforms into control points unnecessarily.
 
 A later pivot option can add selection-center versus individual-anchor behavior. Do not quietly change default behavior during implementation.
+
+Move offers global XYZ arrows, XY/XZ/YZ plane squares, and a center square for view-plane translation. During Move, the live curve/selection preview replaces the gizmo; the gizmo returns at the committed or restored selection after finish/cancel. An edge-on plane or view-aligned depth axis reports unavailable movement rather than jumping. A completed drag forms one undo step; Escape or right-click restores the drag's starting geometry. Canceling a direct-handle gesture also restores its previous component selection.
 
 ## Vertex context menu
 

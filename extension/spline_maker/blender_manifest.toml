@@ -1,6 +1,6 @@
 schema_version = "1.0.0"
 id = "spline_maker"
-version = "0.9.1"
+version = "0.10.3"
 name = "Spline Maker"
 tagline = "Draw and edit splines in the 3D Viewport"
 maintainer = "Spline Maker Project"
@@ -13,4 +13,8 @@ license = ["License pending (local testing only)"]
 paths = [
   "__init__.py", "ui.py", "feasibility.py", "drawing_plane.py", "drawing_probe.py",
   "vertex_selection.py",
+  "vertex_types.py",
+  "tangent_drag.py",
+  "transform_gizmos.py",
+  "edit_drag.py",
 ]

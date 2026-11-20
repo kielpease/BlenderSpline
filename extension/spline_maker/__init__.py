@@ -2,11 +2,12 @@
 
 import bpy
 
-from . import drawing_probe, feasibility, ui, vertex_selection
+from . import drawing_probe, feasibility, ui, vertex_selection, vertex_types, tangent_drag, transform_gizmos, edit_drag
 
 
 CLASSES = (
-    ui.CLASSES + feasibility.CLASSES + vertex_selection.CLASSES
+    ui.CLASSES + feasibility.CLASSES + vertex_selection.CLASSES + vertex_types.CLASSES
+    + tangent_drag.CLASSES + transform_gizmos.CLASSES + edit_drag.CLASSES
     + (drawing_probe.SPLINE_MAKER_OT_exit_draw_tool,)
 )
 
@@ -20,10 +21,15 @@ def register():
     drawing_probe.register_exit_shortcut()
     feasibility.register_curve_shortcuts()
     vertex_selection.register()
+    vertex_types.register()
     bpy.types.VIEW3D_MT_curve_add.append(ui.draw_curve_add_menu)
 
 
 def unregister():
+    edit_drag.unregister()
+    transform_gizmos.unregister()
+    tangent_drag.unregister()
+    vertex_types.unregister()
     vertex_selection.unregister()
     drawing_probe.stop_active()
     drawing_probe.unregister_exit_shortcut()

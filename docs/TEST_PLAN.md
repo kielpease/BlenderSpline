@@ -67,6 +67,26 @@ The 0.9.0 SM-009 background checks on Blender 5.2.4 LTS for Windows validate cli
 3. Select adjacent segments. Check common endpoints are neither duplicated nor transformed twice.
 4. Try Region mode on open and simple closed curves. Check unsupported loops/overlaps produce explicit feedback.
 
+## SM-010 vertex types
+
+Version 0.10.0 passes package validation and the background smoke test on Blender 5.2.4 LTS for Windows. Checks cover tool-context guards, disabled actions without selection, multiple vertices including a selected handle owner, all four handle-type mappings, anchor and topology invariance, manual handle length preservation, independent tangent edits, hidden vertex protection, component selection preservation, and registration cleanup. SM-009 was accepted by the owner on 2026-11-20.
+
+The owner confirmed all four vertex types and Ctrl+Z in 0.10.0, accepting SM-010. They reported oversized Move arrows and missing usable Rotate/Scale controls.
+
+Version 0.10.1 adds a view-facing rotation ring and a square-ended uniform tangent-scale arrow, removes zoom-dependent display scaling, and accepts selected handles of all four types. Background checks cover single-handle eligibility, linked and independent rotation, scale, repeated updates from a fixed snapshot, nonuniform object transforms, anchor/neighbor invariance, and restoration of coordinates/types. Physical drag, screen size, and drag Undo/redo remain unverified: Computer Use was stopped with Escape during viewport investigation before the revised build was tested.
+
+## 0.10.2 switching and redraw regression
+
+The owner reported keyboard/sidebar differences and gizmos refreshing only after viewport navigation in 0.10.1, preferring Blender's standard axis appearance. They confirmed individual Bézier-handle Move worked. The 0.10.2 background suite on Blender 5.2.4 LTS for Windows passes all 16 tool transitions through the shortcut and sidebar operator paths, preserves component selection and geometry, checks merged Q/W/E/R priority in both Curve and 3D View maps with the installed Industry Compatible preset, and verifies cleanup. Existing tangent/vertex/drawing checks also pass.
+
+Tool-owned rendering, live switching without navigation, axis dragging, Cancel and Undo/redo still require the [0.10.2 UI procedure](BUILD.md#0102-tool-switching-regression-check). A separate Blender session was prepared for physical testing, but Computer Use was stopped with Escape before the revised controls could be exercised. Background tests do not establish visual or responsiveness acceptance.
+
+## 0.10.3 selection and direct manipulation
+
+ZIP validation and the full background suite pass on Blender 5.2.4 LTS for Windows. Real curve data and synthetic modal events cover anchor box selection without changing Q/W/E/R, handle-drag versus box branching, stationary handle owners, cancel restoration of geometry/types/selection, independent/linked/Auto/Vector handle behavior, repeated noncompounding updates, and Move constraints/rollback on rotated/nonuniformly scaled objects. Both default and Industry Compatible keymap tests continue to pass. Gizmos now require selected anchors; handle-only selections use direct manipulation.
+
+The owner accepted the 0.10.3 interaction follow-up on 2026-11-20, reporting that everything worked wonderfully. This is overall acceptance of the [viewport workflow](BUILD.md#0103-selection-and-direct-handle-test); no separate per-case results were supplied. The background checks remain distinct from the owner's hands-on acceptance. The earlier pending 0.10.1/0.10.2 interaction reports are superseded by this acceptance.
+
 ## Transform gate
 
 1. Q shows selection without gizmo. W/E/R activate gizmos without moving geometry until manipulated.

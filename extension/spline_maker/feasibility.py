@@ -3,7 +3,6 @@
 from math import radians
 
 import bpy
-from bpy_extras import view3d_utils
 from bpy_extras.object_utils import object_data_add
 from mathutils import Matrix, Vector
 
@@ -47,10 +46,13 @@ def selected_handles(context):
         (point, side)
         for point in editable_bezier_points(context)
         for side in ("left", "right")
-        if (getattr(point, f"handle_{side}_type") in {"FREE", "VECTOR"}
-            or (point.select_control_point and point.handle_left_type == point.handle_right_type == "ALIGNED"))
-        and (point.select_control_point or getattr(point, f"select_{side}_handle"))
+        if point.select_control_point or getattr(point, f"select_{side}_handle")
     ]
+
+
+def selected_vertex_handles(context):
+    return [(point, side) for point in editable_bezier_points(context)
+            if point.select_control_point for side in ("left", "right")]
 
 
 class SPLINE_MAKER_OT_add_test_curve(bpy.types.Operator):
@@ -90,7 +92,7 @@ class SPLINE_MAKER_OT_tangent_step(bpy.types.Operator):
             context.area is not None
             and context.area.type == "VIEW_3D"
             and active_mode(context) in {"ROTATE", "SCALE"}
-            and bool(selected_handles(context))
+            and bool(selected_vertex_handles(context))
         )
 
     def execute(self, context):
@@ -98,11 +100,14 @@ class SPLINE_MAKER_OT_tangent_step(bpy.types.Operator):
         matrix = Matrix.Rotation(radians(15), 3, "Z") if mode == "ROTATE" else Matrix.Scale(1.25, 3)
         handles = [
             (point, f"handle_{side}", point.co + matrix @ (getattr(point, f"handle_{side}") - point.co))
-            for point, side in selected_handles(context)
+            for point, side in selected_vertex_handles(context)
         ]
         for point, attribute, coordinate in handles:
-            if getattr(point, f"{attribute}_type") == "VECTOR":
-                setattr(point, f"{attribute}_type", "FREE")
+            if getattr(point, f"{attribute}_type") in {"VECTOR", "AUTO"}:
+                # Automatic tangents cannot retain a manual edit. Preserve
+                # linked Smooth tangents; Corner tangents become independent.
+                target_type = "ALIGNED" if getattr(point, f"{attribute}_type") == "AUTO" else "FREE"
+                point.handle_left_type = point.handle_right_type = target_type
             setattr(point, attribute, coordinate)
         context.edit_object.data.update_tag()
         context.area.tag_redraw()
@@ -111,10 +116,12 @@ class SPLINE_MAKER_OT_tangent_step(bpy.types.Operator):
 
 class SPLINE_MAKER_OT_switch_tangent_tool(bpy.types.Operator):
     bl_idname = "spline_maker.switch_tangent_tool"
-    bl_label = "Switch Spline Maker Tangent Tool"
+    bl_label = "Switch Spline Maker Tool"
     bl_options = {"INTERNAL"}
 
     target: bpy.props.EnumProperty(items=(
+        ("SELECT", "Select", ""),
+        ("MOVE", "Move", ""),
         ("ROTATE", "Rotate", ""),
         ("SCALE", "Scale", ""),
     ))
@@ -124,95 +131,46 @@ class SPLINE_MAKER_OT_switch_tangent_tool(bpy.types.Operator):
         return (
             context.area is not None
             and context.area.type == "VIEW_3D"
-            and active_mode(context) is not None
+            and context.mode == "EDIT_CURVE" and context.edit_object is not None
+            and len(context.objects_in_mode) == 1
+            and all(s.type == "BEZIER" for s in context.edit_object.data.splines)
         )
 
     def execute(self, context):
-        return bpy.ops.wm.tool_set_by_id(name=tool_id(self.target))
+        from . import tangent_drag, edit_drag, vertex_selection
+        edit_drag.unregister()
+        vertex_selection.stop_active(context)
+        if tangent_drag._active is not None:
+            tangent_drag._active.finish(context, cancel=True)
+        result = bpy.ops.wm.tool_set_by_id(name=tool_id(self.target))
+        # Tool changes from the sidebar need to invalidate the WINDOW region
+        # as well as the sidebar. No timers or forced viewport motion needed.
+        context.area.tag_redraw()
+        for region in context.area.regions:
+            region.tag_redraw()
+        return result
 
 
-class VIEW3D_GGT_spline_maker_tangent(bpy.types.GizmoGroup):
-    bl_idname = "VIEW3D_GGT_spline_maker_tangent"
-    bl_label = "Spline Maker Tangent Step"
-    bl_space_type = "VIEW_3D"
-    bl_region_type = "WINDOW"
-    bl_options = {"PERSISTENT", "SCALE"}
+class SPLINE_MAKER_OT_tool_shortcut(bpy.types.Operator):
+    bl_idname = "spline_maker.tool_shortcut"
+    bl_label = "Switch Active Spline Maker Tool"
+    bl_options = {"INTERNAL"}
+
+    target: bpy.props.EnumProperty(items=tuple((mode, label, "") for _, mode, label in TOOLS))
 
     @classmethod
     def poll(cls, context):
-        return SPLINE_MAKER_OT_tangent_step.poll(context)
+        return SPLINE_MAKER_OT_switch_tangent_tool.poll(context) and active_mode(context) is not None
 
-    def setup(self, context):
-        self.button = self.gizmos.new("GIZMO_GT_button_2d")
-        self.button.target_set_operator(SPLINE_MAKER_OT_tangent_step.bl_idname)
-        self.button.draw_options = {"BACKDROP", "OUTLINE"}
-        self.button.scale_basis = 14
-        self.button.color = (0.15, 0.55, 1.0)
-        self.button.color_highlight = (0.35, 0.75, 1.0)
-        self.button.alpha = 0.85
-        self.button.alpha_highlight = 1.0
-
-    def draw_prepare(self, context):
-        handles = selected_handles(context)
-        position = None
-        if handles:
-            anchor = context.edit_object.matrix_world @ handles[0][0].co
-            position = view3d_utils.location_3d_to_region_2d(context.region, context.region_data, anchor)
-        self.button.hide = position is None
-        if position is not None:
-            self.button.icon = (
-                "DRIVER_ROTATIONAL_DIFFERENCE"
-                if active_mode(context) == "ROTATE"
-                else "FULLSCREEN_ENTER"
-            )
-            self.button.matrix_basis.translation = (position.x, position.y + 36, 0)
+    def execute(self, context):
+        return bpy.ops.spline_maker.switch_tangent_tool(target=self.target)
 
 
 def move_origin(context):
     for point in editable_bezier_points(context):
         if point.select_control_point:
             return point.co
-        if point.select_left_handle:
-            return point.handle_left
-        if point.select_right_handle:
-            return point.handle_right
     return None
-
-
-class VIEW3D_GGT_spline_maker_move(bpy.types.GizmoGroup):
-    bl_idname = "VIEW3D_GGT_spline_maker_move"
-    bl_label = "Spline Maker Move Axes"
-    bl_space_type = "VIEW_3D"
-    bl_region_type = "WINDOW"
-    bl_options = {"PERSISTENT", "3D", "SCALE"}
-
-    @classmethod
-    def poll(cls, context):
-        return active_mode(context) == "MOVE" and move_origin(context) is not None
-
-    def setup(self, context):
-        self.arrows = []
-        for axis in range(3):
-            direction = Vector(tuple(float(i == axis) for i in range(3)))
-            arrow = self.gizmos.new("GIZMO_GT_arrow_3d")
-            arrow.matrix_basis = direction.to_track_quat("Z", "Y").to_matrix().to_4x4()
-            arrow.color = tuple(0.95 if i == axis else 0.18 for i in range(3))
-            arrow.color_highlight = (1.0, 1.0, 1.0)
-            arrow.alpha = 0.85
-            arrow.alpha_highlight = 1.0
-            arrow.scale_basis = 0.8
-            props = arrow.target_set_operator("transform.translate")
-            props.constraint_axis = tuple(i == axis for i in range(3))
-            props.orient_type = "GLOBAL"
-            props.release_confirm = True
-            self.arrows.append(arrow)
-
-    def draw_prepare(self, context):
-        origin = move_origin(context)
-        for arrow in self.arrows:
-            arrow.hide = origin is None
-            if origin is not None:
-                arrow.matrix_basis.translation = context.edit_object.matrix_world @ origin
 
 
 class VIEW3D_PT_spline_maker_probe(bpy.types.Panel):
@@ -232,23 +190,31 @@ class VIEW3D_PT_spline_maker_probe(bpy.types.Panel):
         # an interactive transform.
         layout.operator_context = "EXEC_REGION_WIN"
         mode = active_mode(context)
+        layout.label(text="Spline shortcuts active: Q/W/E/R" if mode is not None else "Click Q Select to enter Spline Maker")
         for key, target, label in TOOLS:
-            op = layout.operator("wm.tool_set_by_id", text=f"{key}  {label}", depress=mode == target)
-            op.name = tool_id(target)
-            op.space_type = "VIEW_3D"
-        if mode == "SELECT":
-            layout.prop(context.space_data.overlay, "display_handle", text="Handles")
+            op = layout.operator("spline_maker.switch_tangent_tool", text=f"{key}  {label}", depress=mode == target)
+            op.target = target
+        if mode is not None:
             layout.label(text="Shift-click to toggle")
             layout.label(text="Drag to box-select vertices")
+            layout.label(text="Drag handle diamonds freely")
+        if mode == "MOVE":
+            layout.label(text="Arrows: axis; squares: plane")
         elif mode in {"ROTATE", "SCALE"}:
+            layout.label(text="Drag an axis ring" if mode == "ROTATE" else "Drag an axis box or center")
             label = "Rotate Handles 15°" if mode == "ROTATE" else "Scale Handles ×1.25"
             layout.operator(SPLINE_MAKER_OT_tangent_step.bl_idname, text=label)
+        if mode is not None:
+            from .vertex_types import draw_vertex_types
+            layout.separator()
+            layout.label(text="Vertex Type (both tangents)")
+            draw_vertex_types(layout)
 
 
 TOOL_KEYMAP = tuple(
-    ("wm.tool_set_by_id", {"type": key, "value": "PRESS"},
-     {"properties": [("name", tool_id(mode))]})
-    for key, mode, _ in TOOLS if mode in {"SELECT", "MOVE"}
+    ("spline_maker.tool_shortcut", {"type": key, "value": "PRESS"},
+     {"properties": [("target", mode)]})
+    for key, mode, _ in TOOLS
 )
 
 
@@ -256,16 +222,17 @@ _curve_shortcuts = []
 
 
 def register_curve_shortcuts():
-    # Native Curve mode handles E and R before the active tool keymap.
-    # Poll lets Blender's bindings run whenever a Spline Maker tool is inactive.
+    # Both keymaps matter: Industry Compatible binds tools in 3D View, while
+    # Blender's default Curve keymap handles E/R before the active tool map.
+    # The shortcut poll confines priority to an active Spline Maker tool.
     keyconfig = bpy.context.window_manager.keyconfigs.addon
     if keyconfig is None:
         return
-    keymap = keyconfig.keymaps.new(name="Curve", space_type="EMPTY", region_type="WINDOW")
-    for key, mode, _ in TOOLS:
-        if mode in {"ROTATE", "SCALE"}:
+    for name, space_type in (("Curve", "EMPTY"), ("3D View", "VIEW_3D")):
+        keymap = keyconfig.keymaps.new(name=name, space_type=space_type, region_type="WINDOW")
+        for key, mode, _ in TOOLS:
             item = keymap.keymap_items.new(
-                SPLINE_MAKER_OT_switch_tangent_tool.bl_idname, key, "PRESS", head=True
+                SPLINE_MAKER_OT_tool_shortcut.bl_idname, key, "PRESS", head=True
             )
             item.properties.target = mode
             _curve_shortcuts.append((keymap, item))
@@ -284,6 +251,7 @@ class SplineMakerSelect(bpy.types.WorkSpaceTool):
     bl_label = "Spline Maker Select"
     bl_icon = "ops.generic.select"
     bl_keymap = TOOL_KEYMAP
+    bl_widget = "VIEW3D_GGT_spline_maker_transform"
 
 
 class SplineMakerMove(bpy.types.WorkSpaceTool):
@@ -293,6 +261,7 @@ class SplineMakerMove(bpy.types.WorkSpaceTool):
     bl_label = "Spline Maker Move"
     bl_icon = "ops.transform.translate"
     bl_keymap = TOOL_KEYMAP
+    bl_widget = "VIEW3D_GGT_spline_maker_transform"
 
 
 class SplineMakerRotate(bpy.types.WorkSpaceTool):
@@ -302,6 +271,7 @@ class SplineMakerRotate(bpy.types.WorkSpaceTool):
     bl_label = "Spline Maker Rotate"
     bl_icon = "ops.transform.rotate"
     bl_keymap = TOOL_KEYMAP
+    bl_widget = "VIEW3D_GGT_spline_maker_transform"
 
 
 class SplineMakerScale(bpy.types.WorkSpaceTool):
@@ -311,14 +281,14 @@ class SplineMakerScale(bpy.types.WorkSpaceTool):
     bl_label = "Spline Maker Scale"
     bl_icon = "ops.transform.resize"
     bl_keymap = TOOL_KEYMAP
+    bl_widget = "VIEW3D_GGT_spline_maker_transform"
 
 
 CLASSES = (
     SPLINE_MAKER_OT_add_test_curve,
     SPLINE_MAKER_OT_tangent_step,
     SPLINE_MAKER_OT_switch_tangent_tool,
-    VIEW3D_GGT_spline_maker_tangent,
-    VIEW3D_GGT_spline_maker_move,
+    SPLINE_MAKER_OT_tool_shortcut,
     VIEW3D_PT_spline_maker_probe,
 )
 WORKSPACE_TOOLS = (SplineMakerSelect, SplineMakerMove, SplineMakerRotate, SplineMakerScale)

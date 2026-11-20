@@ -2,7 +2,7 @@
 
 Planning starter for a Blender extension inspired by the direct spline modeling workflow of 3ds Max. Working title: **Spline Maker**. Suggested GitHub repository: `blender-spline-maker`.
 
-**Status:** The owner verified fixed-plane drawing, click-drag Bézier handles, Shift snapping, centered spline origins, and click-to-close. Version 0.9.1 adds vertex and handle selection in Edit Mode with corrected hover markers.
+**Status:** The owner accepted SM-009 selection, SM-010 vertex types/Undo, and the 0.10.3 interaction follow-up. All-tool box selection, direct handle dragging, and planar/view-plane vertex Move controls are accepted in the viewport. Package validation and background checks pass on Blender 5.2.4 LTS. Next: SM-011 segment selection.
 
 Primary test target: Blender 5.2.4 LTS on Windows. Compatibility beyond that version is unverified.
 

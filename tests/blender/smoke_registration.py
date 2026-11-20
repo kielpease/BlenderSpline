@@ -31,6 +31,10 @@ def main(archive):
     assert_probe(module.feasibility)
     assert_drawing_probe(module.drawing_probe, module.feasibility)
     assert_vertex_selection(module.vertex_selection, module.feasibility)
+    assert_vertex_types(module.vertex_types, module.feasibility)
+    assert_tangent_transforms(module.tangent_drag, module.feasibility)
+    assert_tool_switching(module.feasibility)
+    assert_edit_interactions(module.edit_drag, module.vertex_selection, module.feasibility)
     assert bpy.ops.preferences.addon_disable(module=module_name) == {"FINISHED"}
     assert_disabled(module, menu)
     assert bpy.ops.preferences.addon_enable(module=module_name) == {"FINISHED"}
@@ -46,30 +50,43 @@ def assert_enabled(module, menu):
     assert menu.draw._draw_funcs.count(module.ui.draw_curve_add_menu) == 1
     keymaps = bpy.context.window_manager.keyconfigs.addon.keymaps
     for tool in module.feasibility.WORKSPACE_TOOLS:
+        assert tool.bl_widget == "VIEW3D_GGT_spline_maker_transform"
         items = keymaps[tool._bl_tool.keymap[0]].keymap_items
-        assert [(item.type, item.idname, item.properties.name) for item in items] == [
-            (key, "wm.tool_set_by_id", module.feasibility.tool_id(mode))
-            for key, mode, _ in module.feasibility.TOOLS if mode in {"SELECT", "MOVE"}
+        assert [(item.type, item.idname, item.properties.target) for item in items] == [
+            (key, "spline_maker.tool_shortcut", mode)
+            for key, mode, _ in module.feasibility.TOOLS
         ]
     assert {
         (item.type, item.properties.target) for item in keymaps["Curve"].keymap_items
-        if item.idname == "spline_maker.switch_tangent_tool"
-    } == {("E", "ROTATE"), ("R", "SCALE")}
+        if item.idname == "spline_maker.tool_shortcut"
+    } == {(key, mode) for key, mode, _ in module.feasibility.TOOLS}
+    assert {
+        (item.type, item.properties.target) for item in keymaps["3D View"].keymap_items
+        if item.idname == "spline_maker.tool_shortcut"
+    } == {(key, mode) for key, mode, _ in module.feasibility.TOOLS}
     assert {
         (item.type, item.value, item.shift) for item in keymaps["Curve"].keymap_items
         if item.idname == "spline_maker.vertex_select"
     } == {("LEFTMOUSE", "PRESS", 0), ("LEFTMOUSE", "PRESS", 1)}
+    assert {
+        (item.type, item.value) for item in keymaps["Curve"].keymap_items
+        if item.idname == "spline_maker.vertex_context_menu"
+    } == {("RIGHTMOUSE", "PRESS")}
     keyconfigs = bpy.context.window_manager.keyconfigs
     keyconfigs.update()
     merged_items = keyconfigs.user.keymaps["Curve"].keymap_items
-    for key in ("E", "R"):
+    right_click = next(item for item in merged_items
+                       if item.active and item.type == "RIGHTMOUSE" and item.value == "PRESS"
+                       and not (item.shift or item.ctrl or item.alt or item.oskey))
+    assert right_click.idname == "spline_maker.vertex_context_menu"
+    for key in ("Q", "W", "E", "R"):
         first_match = next(
             item for item in merged_items
             if item.active and item.type == key and item.value == "PRESS" and not (
                 item.shift or item.ctrl or item.alt or item.oskey
             )
         )
-        assert first_match.idname == "spline_maker.switch_tangent_tool", first_match.idname
+        assert first_match.idname == "spline_maker.tool_shortcut", first_match.idname
 
     area = next(area for area in bpy.context.window.screen.areas if area.type == "VIEW_3D")
     with bpy.context.temp_override(area=area):
@@ -87,10 +104,191 @@ def assert_disabled(module, menu):
     assert module.drawing_probe._exit_binding is None
     assert not module.vertex_selection._bindings
     assert module.vertex_selection._cursor_handler is None
+    assert not module.vertex_types._bindings
+    assert module.edit_drag._active is None
+    assert module.vertex_selection._gesture is None
+    assert not module.transform_gizmos._groups
     keymaps = bpy.context.window_manager.keyconfigs.addon.keymaps
     assert not any("Spline Maker" in keymap.name for keymap in keymaps)
-    assert not any(item.idname == "spline_maker.switch_tangent_tool"
+    assert not any(item.idname == "spline_maker.tool_shortcut"
                    for item in keymaps["Curve"].keymap_items)
+    assert not any(item.idname == "spline_maker.tool_shortcut"
+                   for item in keymaps["3D View"].keymap_items)
+    assert not any(item.idname == "spline_maker.vertex_context_menu"
+                   for item in keymaps["Curve"].keymap_items)
+
+
+def assert_vertex_types(types, editing):
+    area = next(area for area in bpy.context.window.screen.areas if area.type == "VIEW_3D")
+    region = next(region for region in area.regions if region.type == "WINDOW")
+    with bpy.context.temp_override(area=area, region=region):
+        assert bpy.ops.spline_maker.add_test_curve() == {"FINISHED"}
+        obj = bpy.context.object
+        spline = obj.data.splines[0]
+        spline.bezier_points.add(1)
+        first, middle, last = spline.bezier_points
+        for point, co in zip((first, middle, last), ((-3, 0, 0), (0, 2, 0), (4, 0, 0))):
+            point.co = co
+            point.handle_left_type = point.handle_right_type = "FREE"
+            point.handle_left = point.co + Vector((-0.8, -0.3, 0))
+            point.handle_right = point.co + Vector((1.2, 0.8, 0))
+        assert bpy.ops.object.mode_set(mode="EDIT") == {"FINISHED"}
+        try:
+            assert bpy.ops.wm.tool_set_by_id(name="builtin.select_box") == {"FINISHED"}
+            assert not bpy.ops.spline_maker.vertex_type.poll()
+            assert not bpy.ops.spline_maker.vertex_context_menu.poll()
+            for mode in ("SELECT", "MOVE", "ROTATE", "SCALE"):
+                assert bpy.ops.wm.tool_set_by_id(name=editing.tool_id(mode)) == {"FINISHED"}
+                assert bpy.ops.spline_maker.vertex_context_menu.poll()
+            bpy.ops.curve.select_all(action="DESELECT")
+            assert not bpy.ops.spline_maker.vertex_type.poll()
+            spline = obj.data.splines[0]
+            first, middle, last = spline.bezier_points
+            anchors = [p.co.copy() for p in spline.bezier_points]
+            original_last = (last.handle_left.copy(), last.handle_right.copy())
+            first.select_control_point = True
+            middle.select_right_handle = True
+            assert bpy.ops.wm.tool_set_by_id(name=editing.tool_id("SELECT")) == {"FINISHED"}
+            selection = [tuple(getattr(p, f) for f in types.SELECTION_FLAGS) for p in spline.bezier_points]
+            for identifier, expected in (("BEZIER", "ALIGNED"), ("BEZIER_CORNER", "FREE"),
+                                         ("CORNER", "VECTOR"), ("SMOOTH", "AUTO")):
+                lengths = [(p.handle_left - p.co).length for p in (first, middle)]
+                right_lengths = [(p.handle_right - p.co).length for p in (first, middle)]
+                coordinates = [(p.handle_left.copy(), p.handle_right.copy()) for p in (first, middle)]
+                assert bpy.ops.spline_maker.vertex_type(vertex_type=identifier) == {"FINISHED"}
+                assert all(p.handle_left_type == p.handle_right_type == expected for p in (first, middle))
+                assert len(obj.data.splines) == 1 and len(spline.bezier_points) == 3
+                assert not spline.use_cyclic_u
+                assert all(p.co == co for p, co in zip(spline.bezier_points, anchors))
+                assert [tuple(getattr(p, f) for f in types.SELECTION_FLAGS) for p in spline.bezier_points] == selection
+                assert (last.handle_left, last.handle_right) == original_last
+                if expected == "ALIGNED":
+                    for i, p in enumerate((first, middle)):
+                        left, right = p.handle_left - p.co, p.handle_right - p.co
+                        assert left.cross(right).length < 1e-5 and left.dot(right) < 0
+                        assert abs(left.length - lengths[i]) < 1e-5
+                        assert abs(right.length - right_lengths[i]) < 1e-5
+                if expected == "FREE":
+                    assert [(p.handle_left, p.handle_right) for p in (first, middle)] == coordinates
+            # Independent tangent editing must preserve the other handle and topology.
+            bpy.ops.spline_maker.vertex_type(vertex_type="BEZIER_CORNER")
+            left = middle.handle_left.copy()
+            middle.handle_right += Vector((0, 0.5, 0))
+            obj.data.update_tag()
+            assert middle.handle_left == left and len(spline.bezier_points) == 3
+            # Hidden selected vertices must remain untouched.
+            last.hide = True
+            last.select_control_point = True
+            bpy.ops.spline_maker.vertex_type(vertex_type="CORNER")
+            assert last.handle_left_type == last.handle_right_type == "FREE"
+        finally:
+            bpy.ops.object.mode_set(mode="OBJECT")
+
+
+def assert_tool_switching(editing):
+    area = next(area for area in bpy.context.window.screen.areas if area.type == "VIEW_3D")
+    region = next(region for region in area.regions if region.type == "WINDOW")
+    with bpy.context.temp_override(area=area, region=region):
+        bpy.ops.spline_maker.add_test_curve()
+        obj = bpy.context.object
+        bpy.ops.object.mode_set(mode="EDIT")
+        try:
+            bpy.ops.curve.select_all(action="DESELECT")
+            first = obj.data.splines[0].bezier_points[0]
+            first.select_left_handle = True
+            geometry = [(p.co.copy(), p.handle_left.copy(), p.handle_right.copy())
+                        for p in obj.data.splines[0].bezier_points]
+            bpy.ops.wm.tool_set_by_id(name="builtin.move")
+            assert not bpy.ops.spline_maker.tool_shortcut.poll()
+            assert bpy.ops.spline_maker.switch_tangent_tool(target="SELECT") == {"FINISHED"}
+            for _, start, _ in editing.TOOLS:
+                for _, target, _ in editing.TOOLS:
+                    bpy.ops.spline_maker.switch_tangent_tool(target=start)
+                    assert bpy.ops.spline_maker.tool_shortcut(target=target) == {"FINISHED"}
+                    assert editing.active_mode(bpy.context) == target
+                    assert first.select_left_handle and not first.select_right_handle
+                    assert not first.select_control_point
+                    assert bpy.ops.spline_maker.switch_tangent_tool(
+                        "EXEC_REGION_WIN", target=target,
+                    ) == {"FINISHED"}
+                    assert editing.active_mode(bpy.context) == target
+                    assert [(p.co, p.handle_left, p.handle_right)
+                            for p in obj.data.splines[0].bezier_points] == geometry
+            # Industry Compatible binds native Q/W/E/R in 3D View. Verify the
+            # merged priority using the installed preset, then restore config.
+            previous = bpy.context.window_manager.keyconfigs.active.name
+            preset = next(Path(path) / "Industry_Compatible.py"
+                          for path in bpy.utils.preset_paths("keyconfig")
+                          if (Path(path) / "Industry_Compatible.py").exists())
+            try:
+                assert bpy.utils.keyconfig_set(str(preset))
+                keyconfigs = bpy.context.window_manager.keyconfigs
+                keyconfigs.update()
+                for name in ("Curve", "3D View"):
+                    items = keyconfigs.user.keymaps[name].keymap_items
+                    for key, _, _ in editing.TOOLS:
+                        match = next(item for item in items
+                                     if item.active and item.type == key and item.value == "PRESS"
+                                     and not (item.shift or item.ctrl or item.alt or item.oskey))
+                        assert match.idname == "spline_maker.tool_shortcut", (name, key, match.idname)
+            finally:
+                bpy.context.window_manager.keyconfigs.active = bpy.context.window_manager.keyconfigs[previous]
+        finally:
+            bpy.ops.object.mode_set(mode="OBJECT")
+
+
+def assert_tangent_transforms(drag, editing):
+    area = next(area for area in bpy.context.window.screen.areas if area.type == "VIEW_3D")
+    region = next(region for region in area.regions if region.type == "WINDOW")
+    with bpy.context.temp_override(area=area, region=region):
+        bpy.ops.spline_maker.add_test_curve()
+        obj = bpy.context.object
+        obj.scale = (2, 0.5, 1)
+        obj.rotation_euler.z = 0.4
+        bpy.context.view_layer.update()
+        bpy.ops.object.mode_set(mode="EDIT")
+        try:
+            bpy.ops.wm.tool_set_by_id(name=editing.tool_id("ROTATE"))
+            first, second = obj.data.splines[0].bezier_points
+            for handle_type in ("VECTOR", "AUTO", "ALIGNED", "FREE"):
+                bpy.ops.curve.select_all(action="DESELECT")
+                first.handle_left_type = first.handle_right_type = handle_type
+                first.select_right_handle = True
+                assert editing.selected_handles(bpy.context) == [(first, "right")]
+                assert not bpy.ops.spline_maker.tangent_step.poll()
+                assert not bpy.ops.spline_maker.tangent_drag.poll()
+                first.select_control_point = True
+                assert bpy.ops.spline_maker.tangent_step.poll()
+                assert bpy.ops.spline_maker.tangent_drag.poll()
+                snapshot = drag.capture(bpy.context)
+                anchor, left, right = first.co.copy(), first.handle_left.copy(), first.handle_right.copy()
+                neighbor = (second.co.copy(), second.handle_left.copy(), second.handle_right.copy())
+                world = obj.matrix_world.to_3x3()
+                matrix = world.inverted() @ Matrix.Rotation(0.6, 3, "Z") @ world
+                drag.apply(obj.data, snapshot, matrix, rotating=True)
+                assert first.co == anchor
+                assert (first.handle_right - anchor - matrix @ (right - anchor)).length < 1e-5
+                if handle_type in {"AUTO", "ALIGNED"}:
+                    assert first.handle_left_type == first.handle_right_type == "ALIGNED"
+                    assert (first.handle_left - anchor - matrix @ (left - anchor)).length < 1e-5
+                else:
+                    assert first.handle_left_type == first.handle_right_type == "FREE"
+                    assert (first.handle_left - anchor - matrix @ (left - anchor)).length < 1e-5
+                # Updates use a fixed snapshot, so mouse events cannot compound.
+                drag.apply(obj.data, snapshot, matrix, rotating=True)
+                assert (first.handle_right - anchor - matrix @ (right - anchor)).length < 1e-5
+                drag.restore(obj.data, snapshot)
+                assert first.handle_left_type == first.handle_right_type == handle_type
+                assert (first.handle_left - left).length < 1e-5
+                assert (first.handle_right - right).length < 1e-5
+                drag.apply(obj.data, snapshot, Matrix.Scale(1.4, 3), rotating=False)
+                assert (first.handle_right - anchor - 1.4 * (right - anchor)).length < 1e-5
+                assert (first.handle_left - anchor - 1.4 * (left - anchor)).length < 1e-5
+                assert first.co == anchor and first.select_control_point
+                assert (second.co, second.handle_left, second.handle_right) == neighbor
+                drag.restore(obj.data, snapshot)
+        finally:
+            bpy.ops.object.mode_set(mode="OBJECT")
 
 
 def assert_vertex_selection(picking, editing):
@@ -154,9 +352,134 @@ def assert_vertex_selection(picking, editing):
                 first.hide = False
 
             assert bpy.ops.wm.tool_set_by_id(name=editing.tool_id("MOVE")) == {"FINISHED"}
-            assert not bpy.ops.spline_maker.vertex_select.poll()
-            assert editing.VIEW3D_GGT_spline_maker_move.poll(bpy.context)
+            assert bpy.ops.spline_maker.vertex_select.poll()
+            assert (editing.active_mode(bpy.context) == "MOVE" and editing.move_origin(bpy.context) is not None)
         finally:
+            bpy.ops.object.mode_set(mode="OBJECT")
+
+
+def assert_edit_interactions(drag, picking, editing):
+    """Native data and synthetic modal events; this does not test UI dispatch."""
+    area = next(area for area in bpy.context.window.screen.areas if area.type == "VIEW_3D")
+    region = next(region for region in area.regions if region.type == "WINDOW")
+    with bpy.context.temp_override(area=area, region=region):
+        bpy.ops.spline_maker.add_test_curve()
+        obj = bpy.context.object
+        bpy.ops.object.mode_set(mode="EDIT")
+        first, second = obj.data.splines[0].bezier_points
+        fake = SimpleNamespace(
+            mode="EDIT_CURVE", edit_object=obj, objects_in_mode=[obj], workspace=bpy.context.workspace,
+            window=bpy.context.window,
+            area=SimpleNamespace(type="VIEW_3D", regions=[], tag_redraw=lambda: None,
+                                 header_text_set=lambda _: None, as_pointer=lambda: 11),
+            region=SimpleNamespace(type="WINDOW", x=0, y=0, width=1000, height=700, as_pointer=lambda: 12),
+            region_data=SimpleNamespace(view_rotation=Quaternion(),
+                view_matrix=Matrix.Translation((0, 0, -10)),
+                perspective_matrix=Matrix.Diagonal((0.1, 0.1, -0.01, 1)),
+                is_perspective=False, view_perspective="ORTHO"),
+            space_data=SimpleNamespace(overlay=SimpleNamespace(show_overlays=True)),
+            window_manager=SimpleNamespace(modal_handler_add=lambda _: None),
+        )
+
+        def event(kind, pixel, value="PRESS"):
+            return SimpleNamespace(type=kind, value=value, mouse_x=pixel[0], mouse_y=pixel[1],
+                                   mouse_region_x=pixel[0], mouse_region_y=pixel[1],
+                                   shift=False, ctrl=False, alt=False)
+
+        def gesture():
+            operator = SimpleNamespace()
+            cls = picking.SPLINE_MAKER_OT_vertex_select
+            operator.cleanup = lambda ctx: cls.cleanup(operator, ctx)
+            operator.cancel = lambda ctx: cls.cancel(operator, ctx)
+            return operator, cls
+
+        def geometry():
+            return [drag.snapshot(point) for point in (first, second)]
+
+        try:
+            for _, mode, _ in editing.TOOLS:
+                bpy.ops.spline_maker.switch_tangent_tool(target=mode)
+                assert bpy.ops.spline_maker.vertex_select.poll()
+                before = geometry()
+                op, cls = gesture()
+                assert cls.invoke(op, fake, event("LEFTMOUSE", (250, 200))) == {"RUNNING_MODAL"}
+                assert cls.modal(op, fake, event("LEFTMOUSE", (650, 500), "RELEASE")) == {"FINISHED"}
+                assert first.select_control_point and second.select_control_point
+                assert geometry() == before and editing.active_mode(bpy.context) == mode
+                # An actual handle hit takes precedence over a marquee in every mode.
+                picking.clear_selection((first, second))
+                second.select_control_point = True
+                initial_selection = [(p.select_control_point, p.select_left_handle, p.select_right_handle)
+                                     for p in (first, second)]
+                component = next(c for c in picking.viewport_components(fake)
+                                 if c.point == first and c.coordinate == "handle_right")
+                start = component.pixel
+                end = (start[0] + 40, start[1] + 25)
+                op, cls = gesture()
+                cls.invoke(op, fake, event("LEFTMOUSE", start))
+                assert cls.modal(op, fake, event("MOUSEMOVE", end, "NOTHING")) == {"RUNNING_MODAL"}
+                assert op.handle_moved and first.co == before[0][0]
+                assert first.handle_right != before[0][2] and drag.snapshot(second) == before[1]
+                assert cls.modal(op, fake, event("ESC", end)) == {"CANCELLED"}
+                assert geometry() == before
+                assert [(p.select_control_point, p.select_left_handle, p.select_right_handle)
+                        for p in (first, second)] == initial_selection
+                assert picking._gesture is None
+
+            for handle_type in ("FREE", "ALIGNED", "AUTO", "VECTOR"):
+                first.handle_left_type = first.handle_right_type = handle_type
+                state = drag.snapshot(first)
+                delta = Vector((0.5, 0.7, 0))
+                for _ in range(2):
+                    drag.translate_handle(first, state, "handle_right", delta)
+                    assert first.co == state[0]
+                    assert (first.handle_right - state[2] - delta).length < 1e-5
+                    if handle_type in {"AUTO", "ALIGNED"}:
+                        left, right = first.handle_left - first.co, first.handle_right - first.co
+                        assert left.cross(right).length < 1e-5 and left.dot(right) < 0
+                        assert abs(left.length - (state[1] - state[0]).length) < 1e-5
+                        assert first.handle_left_type == first.handle_right_type == "ALIGNED"
+                    else:
+                        assert first.handle_left == state[1]
+                        assert first.handle_left_type == first.handle_right_type == "FREE"
+                drag.restore(first, state)
+                assert drag.snapshot(first) == state
+
+            # Simulate axis/plane Move on real curve data after object transforms.
+            obj.rotation_euler.z = 0.4
+            obj.scale = (2, 0.5, 1)
+            bpy.context.view_layer.update()
+            bpy.ops.spline_maker.switch_tangent_tool(target="MOVE")
+            picking.clear_selection((first, second))
+            first.select_control_point = second.select_control_point = True
+            for axis in ("X", "Y", "XY", "VIEW"):
+                before = geometry()
+                cls = drag.SPLINE_MAKER_OT_move_drag
+                op = SimpleNamespace(axis=axis, report=lambda *_: None)
+                op.update = lambda ctx, evt: cls.update(op, ctx, evt)
+                op.finish = lambda ctx, **kwargs: cls.finish(op, ctx, **kwargs)
+                assert cls.invoke(op, fake, event("LEFTMOUSE", (500, 350))) == {"RUNNING_MODAL"}
+                assert cls.modal(op, fake, event("MOUSEMOVE", (560, 400), "NOTHING")) == {"RUNNING_MODAL"}
+                world_delta = obj.matrix_world.to_3x3() @ (first.co - before[0][0])
+                assert world_delta.length > 0.1 and abs(world_delta.z) < 1e-5
+                if axis == "X":
+                    assert abs(world_delta.y) < 1e-5
+                elif axis == "Y":
+                    assert abs(world_delta.x) < 1e-5
+                else:
+                    assert abs(world_delta.x) > 0.1 and abs(world_delta.y) > 0.1
+                for point, state in zip((first, second), before):
+                    assert (obj.matrix_world.to_3x3() @ (point.co - state[0]) - world_delta).length < 1e-5
+                    assert ((point.handle_left - point.co) - (state[1] - state[0])).length < 1e-5
+                assert cls.modal(op, fake, event("RIGHTMOUSE", (560, 400))) == {"CANCELLED"}
+                assert geometry() == before and drag._active is None
+            # An orthographic view cannot disambiguate depth-axis dragging.
+            op = SimpleNamespace(axis="Z", report=lambda *_: None)
+            assert drag.SPLINE_MAKER_OT_move_drag.invoke(op, fake, event("LEFTMOUSE", (500, 350))) == {"CANCELLED"}
+        finally:
+            picking.stop_active(fake)
+            if drag._active is not None:
+                drag._active.finish(fake, cancel=True)
             bpy.ops.object.mode_set(mode="OBJECT")
 
 
@@ -267,9 +590,9 @@ def assert_drawing_probe(probe, editing):
             right = anchor.handle_right - location
             assert right.length > 0 and anchor.handle_right_type == "VECTOR"
             assert bpy.ops.wm.tool_set_by_id(name=editing.tool_id("MOVE")) == {"FINISHED"}
-            assert editing.VIEW3D_GGT_spline_maker_move.poll(bpy.context)
+            assert (editing.active_mode(bpy.context) == "MOVE" and editing.move_origin(bpy.context) is not None)
             assert bpy.ops.spline_maker.switch_tangent_tool(target="ROTATE") == {"FINISHED"}
-            assert editing.VIEW3D_GGT_spline_maker_tangent.poll(bpy.context)
+            assert bpy.ops.spline_maker.tangent_step.poll()
             assert bpy.ops.spline_maker.tangent_step() == {"FINISHED"}
             rotated = Matrix.Rotation(radians(15), 3, "Z") @ right
             assert (anchor.handle_right - location - rotated).length < 1e-5
@@ -485,7 +808,7 @@ def assert_probe(probe):
             neighbor_right = neighbor.handle_right.copy()
             point.select_control_point = True
             assert bpy.ops.wm.tool_set_by_id(name="builtin.select_box") == {"FINISHED"}
-            assert not bpy.ops.spline_maker.switch_tangent_tool.poll()
+            assert not bpy.ops.spline_maker.tool_shortcut.poll()
             for mode in ("SELECT", "MOVE", "ROTATE", "SCALE"):
                 if mode in {"ROTATE", "SCALE"}:
                     assert bpy.ops.spline_maker.switch_tangent_tool(target=mode) == {"FINISHED"}
@@ -493,10 +816,10 @@ def assert_probe(probe):
                     assert bpy.ops.wm.tool_set_by_id(name=probe.tool_id(mode)) == {"FINISHED"}
                 assert probe.active_mode(bpy.context) == mode
                 assert point.select_control_point
-                assert probe.VIEW3D_GGT_spline_maker_tangent.poll(bpy.context) == (
+                assert bpy.ops.spline_maker.tangent_step.poll() == (
                     mode in {"ROTATE", "SCALE"}
                 )
-                assert probe.VIEW3D_GGT_spline_maker_move.poll(bpy.context) == (mode == "MOVE")
+                assert (probe.active_mode(bpy.context) == "MOVE" and probe.move_origin(bpy.context) is not None) == (mode == "MOVE")
                 if mode == "ROTATE":
                     assert bpy.ops.spline_maker.tangent_step() == {"FINISHED"}
                     rotation = Matrix.Rotation(radians(15), 3, "Z")
@@ -505,10 +828,12 @@ def assert_probe(probe):
             rotated_left, rotated_right = point.handle_left.copy(), point.handle_right.copy()
             point.select_control_point = False
             point.select_left_handle = True
+            assert not bpy.ops.spline_maker.tangent_step.poll()
+            point.select_control_point = True
             assert bpy.ops.spline_maker.tangent_step() == {"FINISHED"}
             expected_left = anchor + (rotated_left - anchor) * 1.25
             assert (point.handle_left - expected_left).length < 1e-5
-            assert point.handle_right == rotated_right
+            assert (point.handle_right - (anchor + (rotated_right - anchor) * 1.25)).length < 1e-5
             assert point.co == anchor and neighbor.handle_right == neighbor_right
             for mode in ("SELECT", "MOVE", "ROTATE", "SCALE"):
                 assert bpy.ops.wm.tool_set_by_id(

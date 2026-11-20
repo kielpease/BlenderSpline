@@ -5,9 +5,11 @@ from dataclasses import dataclass
 import bpy
 import gpu
 from bpy_extras.view3d_utils import location_3d_to_region_2d
+from mathutils import Vector
 
 from .drawing_probe import draw_batch
 from .feasibility import active_mode, editable_bezier_points
+from . import edit_drag
 
 
 _COMPONENTS = (
@@ -53,7 +55,7 @@ def selection_active(context):
         and context.region is not None and context.region.type == "WINDOW"
         and context.region_data is not None
         and context.space_data.overlay.show_overlays
-        and active_mode(context) == "SELECT" and supported_curve(context)
+        and active_mode(context) is not None and supported_curve(context)
     )
 
 
@@ -74,7 +76,7 @@ def viewport_components(context):
     return project_components(
         editable_bezier_points(context), context.edit_object.matrix_world,
         lambda world: location_3d_to_region_2d(context.region, context.region_data, world),
-        context.space_data.overlay.display_handle,
+        "ALL",  # Direct manipulation diamonds remain available in every tool.
     )
 
 
@@ -139,33 +141,79 @@ class SPLINE_MAKER_OT_vertex_select(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return selection_active(context) and _gesture is None
+        return selection_active(context) and _gesture is None and edit_drag._active is None
 
     def invoke(self, context, event):
         global _gesture
         pixel = pointer_in_viewport(context, (event.mouse_x, event.mouse_y))
         if pixel is None:
             return {"PASS_THROUGH"}
+        hit = pick_component(viewport_components(context), pixel)
+        self.handle_key = None
+        if hit is not None and hit.coordinate != "co":
+            self.data = context.edit_object.data
+            self.obj = context.edit_object
+            if abs(self.obj.matrix_world.determinant()) < 1e-12:
+                return {"CANCELLED"}
+            self.handle_key = next(
+                (si, pi, hit.coordinate, hit.selection)
+                for si, spline in enumerate(self.data.splines)
+                for pi, point in enumerate(spline.bezier_points) if point == hit.point
+            )
+            self.handle_state = edit_drag.snapshot(hit.point)
+            self.selection_state = [
+                (si, pi, tuple(getattr(point, flag) for _, flag in _COMPONENTS))
+                for si, spline in enumerate(self.data.splines)
+                for pi, point in enumerate(spline.bezier_points)
+            ]
+            self.plane_origin = self.obj.matrix_world @ getattr(hit.point, hit.coordinate)
+            self.plane_normal = context.region_data.view_rotation @ Vector((0, 0, 1))
+            self.world_start = edit_drag.project(context, pixel, self.plane_origin, self.plane_normal)
+            self.inverse = self.obj.matrix_world.inverted().to_3x3()
+            if self.world_start is None:
+                return {"CANCELLED"}
+        else:
+            # Gizmos own their actual hit area. Let Blender dispatch the gizmo
+            # event instead of starting a marquee over its arrows/rings/pads.
+            from .transform_gizmos import gizmo_highlighted
+            if gizmo_highlighted(context):
+                return {"PASS_THROUGH"}
         self.key = viewport_key(context)
         self.start = self.end = pixel
         self.extend = event.shift
         self.dragging = False
+        self.handle_moved = False
         _gesture = self
         context.window_manager.modal_handler_add(self)
         return {"RUNNING_MODAL"}
 
-    def cancel(self, context):
+    def cleanup(self, context):
         global _gesture
         if _gesture is self:
             _gesture = None
             if context.area is not None:
                 context.area.tag_redraw()
 
+    def cancel(self, context):
+        if self.handle_moved:
+            try:
+                si, pi, _, _ = self.handle_key
+                edit_drag.restore(self.data.splines[si].bezier_points[pi], self.handle_state)
+                for si, pi, flags in self.selection_state:
+                    point = self.data.splines[si].bezier_points[pi]
+                    for (_, flag), value in zip(_COMPONENTS, flags):
+                        setattr(point, flag, value)
+                self.data.update_tag()
+            except (ReferenceError, IndexError):
+                pass
+        self.cleanup(context)
+
     def modal(self, context, event):
         if _gesture is not self or not selection_active(context) or viewport_key(context) != self.key:
             self.cancel(context)
             return {"CANCELLED"}
-        if event.type == "ESC" or event.type == "WINDOW_DEACTIVATE":
+        if (event.type in {"ESC", "RIGHTMOUSE", "WINDOW_DEACTIVATE"}
+                or (event.ctrl and event.type == "Z")):
             self.cancel(context)
             return {"CANCELLED"}
         releasing = event.type == "LEFTMOUSE" and event.value == "RELEASE"
@@ -179,6 +227,26 @@ class SPLINE_MAKER_OT_vertex_select(bpy.types.Operator):
         dx, dy = self.end[0] - self.start[0], self.end[1] - self.start[1]
         self.dragging = self.dragging or dx * dx + dy * dy >= _DRAG_THRESHOLD ** 2
         context.area.tag_redraw()
+        if self.dragging and self.handle_key is not None:
+            if context.edit_object != self.obj:
+                self.cancel(context)
+                return {"CANCELLED"}
+            hit = edit_drag.project(context, self.end, self.plane_origin, self.plane_normal)
+            if hit is not None:
+                si, pi, coordinate, flag = self.handle_key
+                point = self.data.splines[si].bezier_points[pi]
+                if not self.handle_moved:
+                    if not self.extend:
+                        clear_selection(editable_bezier_points(context))
+                    setattr(point, flag, True)
+                self.handle_moved = True
+                edit_drag.translate_handle(point, self.handle_state, coordinate,
+                                           self.inverse @ (hit - self.world_start))
+                self.data.update_tag()
+            if releasing:
+                self.cleanup(context)
+                return {"FINISHED"}
+            return {"RUNNING_MODAL"}
         if not releasing:
             return {"RUNNING_MODAL"}
 
@@ -189,7 +257,7 @@ class SPLINE_MAKER_OT_vertex_select(bpy.types.Operator):
         else:
             click_select(points, pick_component(components, self.end), extend=self.extend)
         context.edit_object.data.update_tag()
-        self.cancel(context)
+        self.cleanup(context)
         return {"FINISHED"}
 
 
@@ -212,8 +280,17 @@ def draw_selection():
     components = list(viewport_components(context))
     selected = [pixel for component in components if component.selected
                 for pixel in marker_lines(component, 7)]
+    handles = [pixel for component in components if component.coordinate != "co"
+               for pixel in marker_lines(component, 4)]
+    draw_batch(shader, "LINES", handles, (0.65, 0.75, 0.8, 1.0))
+    guides = [pixel for component in components if component.coordinate != "co"
+              for pixel in (location_3d_to_region_2d(context.region, context.region_data,
+                            context.edit_object.matrix_world @ component.point.co), component.pixel)]
+    if all(pixel is not None for pixel in guides):
+        draw_batch(shader, "LINES", guides, (0.4, 0.5, 0.55, 0.65))
     draw_batch(shader, "LINES", selected, (0.35, 0.72, 1.0, 1.0))
-    if _gesture is not None and _gesture.key == key and _gesture.dragging:
+    if (_gesture is not None and _gesture.key == key and _gesture.dragging
+            and _gesture.handle_key is None):
         x1, y1 = _gesture.start
         x2, y2 = _gesture.end
         corners = ((x1, y1), (x2, y1), (x2, y2), (x1, y2), (x1, y1))
@@ -261,10 +338,15 @@ def unregister():
     if _handler is not None:
         bpy.types.SpaceView3D.draw_handler_remove(_handler, "WINDOW")
         _handler = None
-    _gesture = None
+    stop_active(bpy.context)
     for keymap, item in _bindings:
         keymap.keymap_items.remove(item)
     _bindings.clear()
 
 
 CLASSES = (SPLINE_MAKER_OT_vertex_select,)
+
+
+def stop_active(context):
+    if _gesture is not None:
+        _gesture.cancel(context)

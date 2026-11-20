@@ -60,3 +60,10 @@ Insert vertex preserving Bézier shape; delete vertex with explicit resulting to
 `drawing`, `selection`, `transforms`, `ui`, `geometry`, `bug`, `needs-user-test`, `blocked`, `documentation`.
 
 Track status as Backlog → Ready → In progress → Needs user test → Done. Avoid time estimates until M0 resolves the highest-risk interaction assumptions.
+
+## Current status
+
+- **SM-009 — Done:** owner accepted 0.9.1 after verifying vertex squares and handle diamonds using the sidebar Q Select button. Earlier selection/Undo checks are recorded in TEST_PLAN.md; box dragging has background coverage only.
+- **SM-010 — Done:** owner confirmed all four vertex types and Ctrl+Z in 0.10.0. Subsequent interaction fixes were accepted in 0.10.3; background checks cover both default and Industry Compatible shortcut priority.
+- **0.10.3 interaction follow-up — Done:** owner accepted the build on 2026-11-20, reporting that everything worked wonderfully. This accepts all-tool box selection, direct tangent diamonds, vertex-only gizmos, and planar Move controls. The feedback is overall viewport acceptance, not a separately itemized test log.
+- **Next — SM-011:** segment selection. Ready to begin; not yet implemented.
