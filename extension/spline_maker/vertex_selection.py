@@ -9,7 +9,7 @@ from mathutils import Vector
 
 from .drawing_probe import draw_batch
 from .feasibility import active_mode, editable_bezier_points
-from . import edit_drag
+from . import edit_drag, segment_selection
 
 
 _COMPONENTS = (
@@ -236,9 +236,10 @@ class SPLINE_MAKER_OT_vertex_select(bpy.types.Operator):
                 si, pi, coordinate, flag = self.handle_key
                 point = self.data.splines[si].bezier_points[pi]
                 if not self.handle_moved:
-                    if not self.extend:
-                        clear_selection(editable_bezier_points(context))
-                    setattr(point, flag, True)
+                    if not segment_selection.composite(context):
+                        if not self.extend:
+                            clear_selection(editable_bezier_points(context))
+                        setattr(point, flag, True)
                 self.handle_moved = True
                 edit_drag.translate_handle(point, self.handle_state, coordinate,
                                            self.inverse @ (hit - self.world_start))
@@ -252,7 +253,19 @@ class SPLINE_MAKER_OT_vertex_select(bpy.types.Operator):
 
         points = tuple(editable_bezier_points(context))
         components = list(viewport_components(context))
-        if self.dragging:
+        if segment_selection.level(context) in {"REGION", "WHOLE"}:
+            from . import region_selection
+            reason = (region_selection.box(context, self.start, self.end, extend=self.extend) if self.dragging
+                      else region_selection.click(context, self.end, extend=self.extend))
+            if reason:
+                self.report({"WARNING"}, reason)
+        elif segment_selection.is_active(context):
+            projected = segment_selection.viewport_segments(context)
+            if self.dragging:
+                segment_selection.box(context.edit_object.data, projected, self.start, self.end, extend=self.extend)
+            else:
+                segment_selection.click(context.edit_object.data, projected, self.end, extend=self.extend)
+        elif self.dragging:
             box_select(points, components, self.start, self.end, extend=self.extend)
         else:
             click_select(points, pick_component(components, self.end), extend=self.extend)
@@ -278,6 +291,12 @@ def draw_selection():
     key = viewport_key(context)
     shader = gpu.shader.from_builtin("UNIFORM_COLOR")
     components = list(viewport_components(context))
+    if segment_selection.composite(context):
+        from .region_selection import outline_keys
+        keys = outline_keys(context)
+        edges = [pixel for key, edges in segment_selection.viewport_segments(context) if key in keys
+                 for edge in edges for pixel in edge]
+        draw_batch(shader, "LINES", edges, (0.35, 0.72, 1.0, 1.0))
     selected = [pixel for component in components if component.selected
                 for pixel in marker_lines(component, 7)]
     handles = [pixel for component in components if component.coordinate != "co"
@@ -306,6 +325,21 @@ def draw_hover(window_pixel):
     if pointer is None:
         return
     hit = pick_component(viewport_components(context), pointer)
+    if segment_selection.composite(context) and (hit is None or hit.coordinate == "co"):
+        projected = segment_selection.viewport_segments(context)
+        if segment_selection.is_active(context):
+            key = segment_selection.pick(projected, pointer)
+            keys = {key} if key is not None else set()
+        else:
+            from .region_selection import hover_keys
+            keys = hover_keys(context, pointer, projected)
+        if keys:
+            region = context.region
+            lines = [(p[0] + region.x, p[1] + region.y)
+                     for candidate, edges in projected if candidate in keys for edge in edges for p in edge]
+            shader = gpu.shader.from_builtin("UNIFORM_COLOR")
+            draw_batch(shader, "LINES", lines, (0.45, 1.0, 0.78, 1.0))
+        return
     if hit is not None:
         # Cursor overlays draw in window pixels; mesh projection is region-local.
         region = context.region

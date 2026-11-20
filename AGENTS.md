@@ -9,8 +9,9 @@ Implement the requested issue only, plus necessary dependencies. Do not implemen
 ## Interaction rules
 
 - Click corners; click-drag Bézier handles; Shift constrains placement in 45-degree increments on a fixed drawing plane.
-- Q/W/E/R select tools; 1/2/3/4 select component levels. Keep bindings local to this tool's context.
+- Q/W/E/R select tools; 1/2/3 select Vertex/Segment/Spline and 4 returns to Object Mode, per the owner's workflow refinement. 3 auto-selects the sole spline; with multiple splines it selects individual paths, open or closed. Whole curve remains a visible button for all source splines. 6 enters Spline Maker vertex editing for a single selected editable Bezier curve; preserve native 5 and other-object mode controls. Keep extension bindings scoped.
 - All essential actions need visible buttons or contextual menu entries.
+- Segment box selection selects a segment when any part of its projected curve touches or crosses the box, in either drag direction. Spline/Whole box selection still requires complete enclosure.
 - Do not substitute a hotkey-heavy workflow for the specification.
 - Distinguish breaking tangent linkage (Bézier Corner) from splitting spline topology (Break).
 - Closed-region selection is a logical spline region, not editable generated mesh faces.

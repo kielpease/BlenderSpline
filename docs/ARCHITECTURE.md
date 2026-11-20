@@ -1,4 +1,4 @@
-# Proposed architecture
+# Architecture and implementation decisions
 
 ## Foundation
 
@@ -8,25 +8,28 @@ Keep document state (source curves and relevant settings) separate from transien
 
 ## Source layout
 
-SM-001 implements the extension entry point, manifest, viewport UI, and background smoke test. SM-002 adds the isolated `extension/spline_maker/feasibility.py` probe.
+The extension retains its original feasibility module names where they are registered identifiers. Current responsibilities are:
 
 | Path | Responsibility |
 | --- | --- |
 | `extension/spline_maker/__init__.py` | Register/unregister and lifecycle cleanup |
 | `extension/spline_maker/blender_manifest.toml` | Extension metadata |
-| `extension/spline_maker/operators/draw.py` | Drawing interaction state machine |
-| `extension/spline_maker/operators/edit.py` | Vertex types and edit commands |
-| `extension/spline_maker/tools.py` | Workspace tools and scoped bindings |
-| `extension/spline_maker/selection.py` | Logical component selections and picking |
-| `extension/spline_maker/transforms.py` | Selection-to-transform adapter and pivots |
-| `extension/spline_maker/overlay.py` | Preview/highlight drawing and cleanup |
+| `extension/spline_maker/drawing_probe.py` | Drawing state, modal operator and drawing tool |
+| `extension/spline_maker/drawing_plane.py` | Fixed-plane projection and placement constraints |
+| `extension/spline_maker/vertex_types.py` | Vertex types and context menu |
+| `extension/spline_maker/feasibility.py` | Edit workspace tools, mode entry/exit, scoped keys, pivots and Edit panel |
+| `extension/spline_maker/vertex_selection.py` | Component gestures, direct handle drags and selection markers |
+| `extension/spline_maker/segment_selection.py` | Logical segments, screen-space sampling, picking and level controls |
+| `extension/spline_maker/region_selection.py` | Individual-spline and Whole geometry selection |
+| `extension/spline_maker/region_geometry.py` | Validated closed-interior geometry |
+| `extension/spline_maker/edit_drag.py` | Move snapshots, axis/plane projection, update and rollback |
+| `extension/spline_maker/tangent_drag.py` | Vertex tangent rotation/scaling |
+| `extension/spline_maker/transform_gizmos.py` | Tool-owned axes, rings, pads and center controls |
+| `extension/spline_maker/display.py` | Bright source-curve overlay and session display settings |
 | `extension/spline_maker/ui.py` | Menus and visible controls |
-| `extension/spline_maker/core/` | Plane projection, constraints, curve math, state |
-| `tests/unit/` | Math and state tests outside Blender where practical |
-| `tests/blender/` | Background registration/data smoke tests |
-| `scripts/` | Build and focused validation helpers |
+| `tests/blender/` | Background registration, native-data, geometry and synthetic interaction checks |
 
-Do not create empty modules merely to match this table. Introduce each when its milestone needs it.
+The decisions below record the sequence of milestones; later refinements supersede earlier deferrals and mappings.
 
 ## Critical feasibility decisions
 
@@ -97,6 +100,89 @@ The gizmo group records only transient viewport/group references for hit arbitra
 `edit_drag.py` owns projection, point snapshots, direct-handle placement, and the Move operator. Global-axis/plane/view-plane drag deltas are converted through the object's inverse matrix. Every preview applies the current delta to the original coordinates, avoiding compounded motion and retaining native curve topology. Escape/right-click, tool changes, and unregister restore active sessions. The gizmo arrows/pads invoke this operator instead of native Translate. All gizmos hide during the Move preview, eliminating the simultaneous native-arrow offset display; they return after finish/cancel. This deliberately changes the drag display rather than claiming the old native ghost has been visually verified as fixed.
 
 Background checks use real Blender curve data plus synthetic regions/events to validate selection and modal state logic. They do not establish actual gizmo hit dispatch, rendering, or undo history behavior in the UI.
+
+## SM-011 segment selection
+
+`segment_selection.py` enumerates native Bézier segments by spline index and starting point, including cyclic closing segments and skipping hidden endpoints. It subdivides each world-space cubic with de Casteljau until projected control-polygon error is at most 0.75 pixels, capped at depth ten. Picking uses minimum screen-space distance to the resulting line edges within nine pixels. Unprojectable spans break the polyline rather than creating a phantom bridge. Equal-distance ties resolve in stable spline/start order; this is not occlusion-aware surface picking. The overlay draws selected segments blue and hovered segments mint.
+
+Logical identity uses native outgoing/incoming handle selection flags paired with endpoint anchor flags. Selecting an edge sets its start's right flag and end's left flag; anchor selection is the union. Selecting separated segments therefore cannot imply the intervening segment merely because its endpoints are selected. Native Edit Mode undo stores these flags; the background suite verifies Undo/Redo of two different segment selections. No cached RNA segment references or custom source-curve metadata are required. In Segment level, direct handle drags preserve all selection flags, retaining identity.
+
+Selection level is a transient WindowManager enum reset on unregister. Visible buttons and guarded 1/2 bindings expose Vertex and Segment. Level changes cancel active gestures; entering Segment clears selection, and returning to Vertex retains endpoint anchors while clearing edge-code handle flags. Level changes are UI context changes, not an additional undo step. The current level itself is not part of Curve Edit Mode undo. Region and whole-curve levels are deferred.
+
+Move resolves the logical endpoint set and snapshots each point once. Vertex-mode math and direct handles remain available; segment Rotate/Scale gizmos and tangent steps are disabled because their selection-center semantics belong to SM-015. Background checks cover geometry, identity, native undo, lifecycle, and projection; actual mouse dispatch and rendered picking still require viewport acceptance.
+
+The owner accepted segment highlighting, selection, Move, and returning to Vertex editing in 0.11.0, then confirmed the centered gizmo in 0.11.1. `move_origin` averages unique selected endpoints in Segment level; the Move operator uses the same origin for its projection plane. For a curved segment, this is its anchor midpoint rather than a point evaluated along the curve.
+
+## SM-012 region and whole-curve selection
+
+`region_geometry.py` validates native closed Bézier loops in a local plane derived from all anchors and handles. Planarity tolerance is max(1e-6, extent × 1e-5). Curves are sampled at extent × 0.0005 flatness, with a 2048-vertex safety cap. A sweep broad phase rejects self-intersections/touches, while coplanar boundary intersection/containment rejects overlaps, nesting and holes. This is a bounded polygon approximation, not an exact curve-boolean kernel. Invalid closed boundaries disable Region conservatively; open splines are excluded without blocking otherwise eligible loops. Hidden boundaries and degenerate/nonplanar curves have explicit reasons.
+
+`region_selection.py` caches validation by copied source coordinates/topology/visibility and data identity, storing no RNA point references. Geometry changes invalidate the cache; unregister clears it. Interior picking intersects the mouse ray with each candidate plane, transformed with the inverse-transpose normal. Multiple projected hits are reported as ambiguous. Selection/hover draw only outlines. Region selection uses all native anchor and handle flags on each chosen loop, retaining native Edit Mode Undo/Redo without custom persistent metadata. Region Move resolves unique selected boundary anchors and uses their center.
+
+Whole selection sets native flags for every point of every spline, including hidden points. Deselecting source geometry never deselects or changes the active object. The sidebar distinguishes those states and exposes Select/Clear actions. Direct handle gestures preserve composite selection flags. Whole Move is disabled to avoid baking an object transform into edit coordinates before SM-014; non-vertex Rotate/Scale remains deferred to SM-015.
+
+The existing transient selection-level enum now has all four entries, with scoped 1–4 shortcuts and visible controls. Region's button is disabled with a reason when no valid loop exists; its shortcut reports the same reason. Entering Whole selects geometry; entering Segment/Region clears it; Vertex retains anchors. Drawing Finish selects the new source geometry and sets Whole level. These UI level changes remain separate from native source-selection undo. Background checks validate geometry, projection, selection and native Undo; viewport acceptance remains pending.
+
+## 0.12.1 entry shortcuts and readable curve display
+
+2/3 now bind an entry operator whose poll permits one supported Bézier object in Curve Edit Mode even with a native tool active. It activates Spline Maker Select when needed, then delegates to the existing selection-level operator. Normal level changes and 1/4 retain their existing scope. Object Mode and mesh contexts fail the entry poll. This makes entry explicit rather than changing native Q/W/E/R bindings outside Spline Maker.
+
+`display.py` registers an earlier POST_PIXEL callback than the selection markers. It samples native Bézier source segments, paints unselected spans in a light-blue session color, and paints selected spans blue. The custom selection/hover callbacks draw afterward. This callback is independent of the active workspace tool in supported Curve Edit Mode, and respects Show Overlays/hidden points. It shares the existing screen-space sampling approach; no source material, geometry, or global theme is changed. Bright-overlay enabled/color properties live on WindowManager and are cleared on unregister. The panel also exposes Blender's `View3DOverlay.show_curve_normals`, verified against the installed 5.2.4 UI scripts and the [official API](https://docs.blender.org/api/current/bpy.types.View3DOverlay.html#bpy.types.View3DOverlay.show_curve_normals). That native viewport option is not automatically changed by registration.
+
+Keyboard dispatch and rendered contrast/ordering still require viewport acceptance; background checks establish operator entry, merged maps, and lifecycle only.
+
+## 0.12.2 explicit Edit Mode exit
+
+`SPLINE_MAKER_OT_finish_edit` in `feasibility.py` provides the shared exit action. It cancels/rolls back owned move, tangent, and selection gestures, sets the Edit workspace tool to native Select Box, calls Blender's native Object Mode transition, then sets Object Mode Select Box and resets the transient level to Vertex. The active object and committed source geometry remain under Blender's normal mode-transition handling. Clearing the gizmo hit registry discards transient group references.
+
+The panel button is available in supported Curve Edit Mode, including with native tools active. A separate guarded shortcut operator delegates to it only when a Spline Maker Edit tool is active. Curve and 3D View keymaps give Esc priority in that context, while existing modal operators consume Esc for cancellation first. Drawing remains in its own Object Mode modal scope. The native mode dropdown remains available as an exit in previous builds and unsupported edit contexts.
+
+Background checks verify mode/tool transitions and data preservation. Physical Esc priority and panel rendering await viewport acceptance.
+
+
+## 0.12.3 drawing lifecycle and native-compatible keys
+
+Successful Finish switches the Object workspace tool to native Select Box after commit and modal cleanup. This covers open and closed finishes, preventing the next selection click from invoking the armed Draw tool. Existing curve geometry and initial Whole geometry selection are preserved.
+
+The original 4/Whole shortcut is removed. Guarded 4 now shares the existing Object Mode exit with Esc. Whole curve remains a visible selection button. The owner explicitly requested this native-compatible workflow; 5/6 are left to the existing Blender keymap.
+
+The display callback now samples unselected visible all-Bezier curve objects in Object Mode through their own transforms. Selected objects keep native outlines. Object Mode sampling includes hidden edit points; Edit Mode retains its prior hidden-point behavior. Display controls are exposed in both panel contexts. This remains a screen-space overlay with the existing depth/visibility limitations, not a source material or geometry change. Rendering and physical workflow acceptance remain pending.
+
+## 0.12.4 explicit Edit entry
+
+`spline_maker.enter_edit` in `feasibility.py` is shared by the Object Mode panel button and guarded 6 bindings in Object Mode, Curve, and 3D View keymaps. Object entry requires a single selected editable all-Bezier curve, uses the native mode transition, then delegates to the existing Q Select tool and Vertex-level operators. In supported Curve Edit Mode it also works from native tools or another component level. Repeated 6 stays in Edit Mode. Poll rejects mesh/other object contexts and Object Mode multi-selection; native 1/5 are unchanged. Unregister removes all owned bindings through the existing shortcut registry.
+
+The owner accepted 0.12.3, explicitly confirming Object Mode color and 4 exit. The added 6 shortcut and button require their own physical viewport check.
+
+## 0.12.5 individual spline selection
+
+The existing internal `REGION` enum and `selected_regions`/`select_regions` helpers now represent the visible Spline level. Their eligible set is every fully visible Bezier spline, independent of closure or planarity. Native anchor/handle flags encode each complete selected path, so selection Undo/Redo and Move reuse the existing data paths. Level entry automatically selects index 0 only when the object actually contains one spline; multiple splines start empty. Repeated 3 reselects a sole path.
+
+Boundary and anchor picking use projected source geometry and return spline identities before attempting closed-interior tests. Multiple hits report ambiguity. The existing cached planar-loop validation remains responsible only for safe interior picking. Boxes require all projected anchors and sampled curve edges of an individual spline to be enclosed. A spline containing hidden points is excluded from this level, preventing Move from affecting only part of a path. Whole-object geometry selection still includes all source splines. Attach and topology changes are not implemented here.
+
+The owner confirms 6 entry works in 0.12.4. The Spline-level refinement requires separate viewport acceptance.
+
+## SM-013 tool/level integration (0.13.0)
+
+`enter_selection_level` now accepts all four existing levels. Visible panel buttons and 1/2/3 call this operator; its supported-curve poll permits a native Curve Edit tool, activates Q Select if needed, then delegates to the original level-change implementation. Object Mode and mesh editing still fail that poll. 1 is no longer dependent on the Spline Maker workspace tool being active. Panel level controls render for supported native Curve Edit contexts as well as active Spline Maker tools. Tool/gesture hints are limited to the active custom context.
+
+`tests/blender/control_checks.py` exercises the shared entry path and every Q/W/E/R transition across Vertex, Segment, Spline and Whole with real transformed native curve data. The existing gizmo draw-preparation method is called with synthetic controls to verify visibility state and world-space placement, including Q hiding all controls. This does not verify GPU rendering or physical gizmo dispatch. Existing lifecycle and both-keymap priority checks remain in the full smoke suite.
+
+The owner accepted 0.12.5's Spline selection workflow overall, then accepted SM-013 in 0.13.0, explicitly confirming Move in Vertex/Segment/Spline. This is overall task acceptance rather than an itemized report for every tool/keymap case. Whole curve Move remains the next SM-014 implementation task.
+
+## SM-014 Whole curve Move (0.14.0)
+
+The audit confirmed that the remaining implementation gap was `selected_anchors` returning an empty set for Whole level. It now returns every source Bezier anchor, including hidden points, when all source geometry is selected. The shared Move snapshot captures each point once and translates anchors and both handles by the world-axis/plane delta converted through the inverse object matrix. Existing gizmo centering, modal hiding, repeated-update behavior, cancellation and cleanup apply unchanged. Whole Rotate/Scale remains disabled.
+
+An installed 5.2.4 LTS check changed object location between native Curve Edit undo pushes. Undo and Redo left the object at the changed location. Direct object-transform mutation in Curve Edit Mode therefore fails the required undo contract. Whole Move uses source geometry translation in Edit Mode; native Object Mode remains the object-transform path. The object matrix, origin and hierarchy stay unchanged. This supersedes the previous plan to implement Whole Move as an object transform while keeping Curve Edit Mode.
+
+`whole_move_checks.py` covers multiple splines with Free/Aligned/Auto/Vector handles, hidden points, rotated/nonuniformly scaled parents and objects, all axes/planes, no compounded preview, selection/type preservation, no-op release, cancellation, tool-change/unregister rollback and native geometry Undo/Redo. The old test-curve sidebar button is removed; its operator remains internal for background fixtures. Viewport acceptance of Whole curve Move remains pending.
+
+## 0.14.1 Segment crossing-box selection
+
+`segment_selection.box` now clips each existing sampled screen-space edge against the inclusive selection rectangle and selects a logical segment if any edge intersects. The two-axis parameter-interval test includes endpoint, edge and corner touches, plus crossings with both sample endpoints outside. It rejects disjoint edges whose bounding boxes merely overlap, unlike a bounding-box-only test. The existing 0.75-pixel adaptive curve sampling, projection breaks, native selection flag encoding, hidden-point filtering and Shift-add behavior remain shared with click selection. Spline/Whole box logic stays separate and requires enclosure. The panel hint now describes touching a segment.
+
+The owner accepted Whole curve Move in 0.14.0, completing SM-014. The Segment box correction requires its own viewport check.
 
 ## Later geometry
 

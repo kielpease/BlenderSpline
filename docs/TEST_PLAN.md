@@ -87,6 +87,75 @@ ZIP validation and the full background suite pass on Blender 5.2.4 LTS for Windo
 
 The owner accepted the 0.10.3 interaction follow-up on 2026-11-20, reporting that everything worked wonderfully. This is overall acceptance of the [viewport workflow](BUILD.md#0103-selection-and-direct-handle-test); no separate per-case results were supplied. The background checks remain distinct from the owner's hands-on acceptance. The earlier pending 0.10.1/0.10.2 interaction reports are superseded by this acceptance.
 
+## SM-011 segment selection (0.11.0)
+
+Package validation and the complete background suite pass on Blender 5.2.4 LTS for Windows. New checks cover curved midpoint picking at three projection scales on transformed geometry; separate spline identities; Shift toggle and deselection; box enclosure; separated segments without an inferred middle segment; cyclic closing edges; hidden endpoints; unique shared endpoints under translation; preserved identity across Q/W/E/R and direct handle data edits; and disabled segment Rotate/Scale. Native Edit Mode Undo and Redo restore the exact logical selected segment after explicit undo boundaries. Registration/cleanup checks include the transient level property and scoped 1/2 bindings.
+
+The owner accepted SM-011 after verifying segment highlighting, selection, gizmo Move, and switching back to Vertex for further editing. This is acceptance of those reported behaviors, not a separately itemized result for every case in the [viewport procedure](BUILD.md#sm-011-segment-selection-test).
+
+The owner accepted the centered Move gizmo in 0.11.1. Vertex-mode positioning and segment Rotate/Scale scope are unchanged.
+
+## SM-012 whole curve and closed regions (0.12.0)
+
+The package and full background suite pass on Blender 5.2.4 LTS for Windows. New checks cover valid separate planar loops with an open spline, curved loop sampling/interior classification, native Region and Whole geometry selection Undo/Redo, Shift-toggle and box enclosure via synthetic projection, boundary endpoint union/center, object activation distinct from geometry selection, geometry-preserving whole selection, and disabled deferred transforms. Tests verify ray-plane picking through tilted/nonuniform object transforms, cache invalidation after handle edits, and rejection of open, collinear, self-intersecting, nonplanar, overlapping, nested and touching boundaries. Regions on different planes that overlap in projection report ambiguity without changing selection.
+
+Physical picking/hover, drawing default level, disabled-button layout, actual gizmo dispatch, Region Move and UI operator Undo grouping still need the [SM-012 viewport procedure](BUILD.md#sm-012-whole-curve-and-region-test). Background data and projection tests are not UI verification.
+
+## 0.12.1 keyboard entry and curve display
+
+The owner reported that native 1/4 worked but 2/3 required clicking sidebar Q Select. New background checks on Blender 5.2.4 LTS cover direct Segment entry from native Select Box and Region entry from native Move, the resulting active Spline Maker tool/level, entry rejection in Object Mode, merged 2/3 keymap priority with Industry Compatible, and cleanup of the display properties/handler. The complete suite, native Region/Whole Undo/Redo, package validation, and diff checks pass.
+
+The [0.12.1 viewport check](BUILD.md#0121-keyboard-and-visibility-check) remains pending. Background tests do not establish physical key delivery, color/contrast, overlay ordering, or the checkbox's visual effect on normals.
+
+## 0.12.2 explicit editing exit
+
+The owner reported being stuck in component editing after choosing Whole curve and Q Select. Version 0.12.2 exposes Finish Editing → Object Mode and adds a guarded Esc binding in Curve and 3D View keymaps. The full suite and ZIP validation pass on Blender 5.2.4 LTS for Windows. New background checks exercise button and shortcut operator paths across all four tools and four selection levels, verify unchanged native curve geometry/object lists, keep the same selected active object, reset both Object/Edit tools to Select Box, reset the transient level, and reject the shortcut in native Edit tools and Object Mode. Lifecycle checks verify removal of the Esc bindings.
+
+The [0.12.2 viewport check](BUILD.md#0122-finish-editing-test) remains pending, especially physical event priority: Esc during a modal drag must cancel only the drag, and the next Esc must leave Edit Mode. Operator/background checks do not establish that UI dispatch sequence.
+
+
+## 0.12.3 finish, Object Mode visibility, and mode keys
+
+Validation and the complete suite pass on Blender 5.2.4 LTS for Windows. Drawing checks activate the actual Draw workspace tool before open Finish and closing-click modal logic, then verify Select Box is active. Display eligibility checks cover unselected/selected/hidden curve objects and inclusion of edit-hidden points in Object Mode source sampling. Keymap checks verify 4/Esc exit, removal of 4/Whole, and no extension 5/6 bindings. Existing selection, geometry, native Undo/Redo and edit-exit checks continue to pass.
+
+The owner reports selection working. Actual finish/edit/reselect click dispatch, rendered Object Mode colors/depth behavior, and physical key priority in the owner's keymap remain pending under the 0.12.3 procedure in BUILD.md. Background checks are not UI verification.
+
+The owner subsequently accepted 0.12.3 and explicitly confirmed spline color and 4 returning to Object Mode with the menu disappearing. Selection had already been reported working. This is overall acceptance, not a separately itemized execution of every test above.
+
+## 0.12.4 Edit Spline entry
+
+ZIP validation and the complete background suite pass on Blender 5.2.4 LTS for Windows. Background checks cover entering Q Select / Vertex Edit Mode, returning with the shared 4 exit operator, repeating entry without geometry/object changes, entry from a native Edit tool and Whole level, and rejection for no selection, meshes in Object/Edit Mode, mixed curve types, and multiple selected objects. Lifecycle checks cover 6 bindings in Object Mode, Curve, and 3D View, plus merged shortcut priority with the installed Industry Compatible preset. Physical 6 delivery and the Object Mode Edit Spline button still require the procedure in BUILD.md.
+
+The owner subsequently confirms pressing 6 works well. The sidebar button and unsupported-context cases were not separately reported.
+
+## 0.12.5 Spline level
+
+ZIP validation and the complete background suite pass on Blender 5.2.4 LTS for Windows. New checks cover sole-spline auto-selection for open, closed, nonplanar, self-intersecting, and one-anchor paths; repeating 3; native selection Undo/Redo; retention on returning to Vertex; geometry invariance; and rejection of partially hidden paths. Multi-spline checks cover independent open-path picking, centered Move eligibility, Shift toggles, whole-path box enclosure, nonplanar boundary picking, and no arbitrary automatic selection when multiple paths exist. Closed-loop validation and ambiguity tests remain in place for interior picking. Physical 3 entry, highlights, picking, boxes and Move require the 0.12.5 procedure in BUILD.md.
+
+The owner subsequently reported that 0.12.5 works well and requested the next task. This accepts the Spline selection refinement overall; individual cases above were not separately reported.
+
+## SM-013 tool/level integration (0.13.0)
+
+ZIP validation and the complete background suite pass on Blender 5.2.4 LTS for Windows. New checks use real native curve data under translation, rotation and nonuniform scale. They cover direct entry into each level from a native Edit tool; availability of all level buttons in the panel's draw path; all 16 Q/W/E/R transitions per level through keyboard/button operators; unchanged selection flags, level, geometry and handle types; Q disabling transform operators; native-tool shortcut guards; and Object Mode/mesh exclusion. Synthetic gizmo controls verify the actual draw-preparation method's visibility state and world-space origin, including all controls hidden for Q. Merged Industry Compatible checks now include 1 entry. Physical key delivery, panel layout, redraw timing and rendered gizmos require the SM-013 procedure in BUILD.md.
+
+The owner subsequently called 0.13.0 a success, explicitly confirming Move works well in 1 Vertex, 2 Segment and 3 Spline. SM-013 is accepted on that overall report; no separate per-case results were supplied. Whole curve Move and non-vertex Rotate/Scale are still pending implementation in SM-014/015.
+
+## SM-014 Whole curve Move (0.14.0)
+
+The owner already accepts Move in Vertex/Segment/Spline. The audit found the separate Whole curve action disabled; this build adds it to the shared geometry-translation implementation. ZIP validation and the complete background suite pass on Blender 5.2.4 LTS for Windows.
+
+New native-data/synthetic-event checks exercise multiple open splines and every handle type, including an edit-hidden point. Under parent and object rotation/nonuniform scale, XYZ/XY/XZ/YZ/view-plane drags translate every anchor and handle by the same world delta while keeping the object/parent/child matrices unchanged. Repeated preview, handle types, selection flags, no-op release, Esc/right-click/Ctrl+Z/window-deactivation cancellation, tool-change/unregister rollback, cleared-selection guards and native Curve Edit Undo/Redo pass. Gizmo-state integration now expects Whole Move to be visible in W and hidden in Q. The added Whole interaction and physical undo grouping still need the 0.14.0 viewport procedure in BUILD.md.
+
+An installed-version diagnostic verified why source geometry is moved: changing object location in Curve Edit Mode was not undone by native Curve Edit undo pushes. Object Mode remains the native object-transform workflow.
+
+The owner subsequently confirms Move in 0.14.0 works as intended. SM-014 is accepted on that overall report; individual constraint/undo cases were not separately reported.
+
+## 0.14.1 Segment crossing-box selection
+
+ZIP validation and the complete background suite pass on Blender 5.2.4 LTS for Windows. Focused checks cover horizontal/vertical crossings with both endpoints outside, exact edge/corner touches, degenerate sampled edges, and a bounding-box overlap that does not intersect the rectangle. Native curve checks use a small box around a curved segment's middle at three zoom levels under a rotated/nonuniform transform, both box directions, Shift-add, empty-space replace/add, hidden endpoints, empty projected spans and sparse samples crossing a box. Existing native selection Undo/Redo and the full interaction suite pass. Physical drag selection and the changed panel hint need the 0.14.1 procedure in BUILD.md.
+
+The owner subsequently confirms the 0.14.1 correction works great. Segment crossing-box selection is accepted on that overall report; individual cases were not separately reported.
+
 ## Transform gate
 
 1. Q shows selection without gizmo. W/E/R activate gizmos without moving geometry until manipulated.

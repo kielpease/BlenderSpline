@@ -16,7 +16,11 @@ class VIEW3D_PT_spline_maker(bpy.types.Panel):
         row = self.layout.row()
         row.operator_context = "INVOKE_REGION_WIN"
         row.operator(SPLINE_MAKER_OT_draw_spline.bl_idname)
-        self.layout.operator("spline_maker.add_test_curve")
+        row = self.layout.row()
+        row.operator_context = "EXEC_REGION_WIN"
+        row.operator("spline_maker.enter_edit", text="6  Edit Spline")
+        from .display import draw_settings
+        draw_settings(self.layout, context)
 
 
 def draw_curve_add_menu(self, context):

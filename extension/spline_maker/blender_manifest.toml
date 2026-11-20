@@ -1,6 +1,6 @@
 schema_version = "1.0.0"
 id = "spline_maker"
-version = "0.10.3"
+version = "0.14.1"
 name = "Spline Maker"
 tagline = "Draw and edit splines in the 3D Viewport"
 maintainer = "Spline Maker Project"
@@ -17,4 +17,7 @@ paths = [
   "tangent_drag.py",
   "transform_gizmos.py",
   "edit_drag.py",
+  "segment_selection.py",
+  "region_geometry.py", "region_selection.py",
+  "display.py",
 ]

@@ -101,6 +101,9 @@ class VIEW3D_GGT_spline_maker_transform(bpy.types.GizmoGroup):
         _groups[viewport_key(context)] = self
         mode = active_mode(context)
         origin = move_origin(context)
+        from .segment_selection import composite
+        if composite(context) and mode in {"ROTATE", "SCALE"}:
+            origin = None
         for gizmo, target, basis, view_facing in self.controls:
             # The drag owns the live preview. Do not draw a second, offset
             # native arrow while the operation is moving the selection.

@@ -5,7 +5,7 @@ from bpy_extras.view3d_utils import region_2d_to_origin_3d, region_2d_to_vector_
 from mathutils import Vector
 from mathutils.geometry import intersect_line_plane
 
-from .feasibility import active_mode, editable_bezier_points
+from .feasibility import active_mode, editable_bezier_points, move_origin
 
 _active = None
 
@@ -59,13 +59,27 @@ def translate_handle(point, state, coordinate, delta):
 
 
 def selected_anchors(context):
+    from . import segment_selection
+    if segment_selection.level(context) == "WHOLE":
+        from .region_selection import whole_selected
+        data = context.edit_object.data
+        return ([point for spline in data.splines if spline.type == "BEZIER" for point in spline.bezier_points]
+                if whole_selected(data) else [])
+    if segment_selection.level(context) == "REGION":
+        from .region_selection import selected_regions
+        data = context.edit_object.data
+        return [point for index in sorted(selected_regions(data)) for point in data.splines[index].bezier_points]
+    if segment_selection.is_active(context):
+        data = context.edit_object.data
+        keys = segment_selection.endpoints(data, segment_selection.selected(data))
+        return [data.splines[si].bezier_points[pi] for si, pi in sorted(keys)]
     return [point for point in editable_bezier_points(context) if point.select_control_point]
 
 
 class SPLINE_MAKER_OT_move_drag(bpy.types.Operator):
     bl_idname = "spline_maker.move_drag"
-    bl_label = "Move Spline Vertices"
-    bl_description = "Move selected vertices along an axis or plane; Esc cancels"
+    bl_label = "Move Spline Selection"
+    bl_description = "Move selected vertices, segments, or complete splines along an axis or plane; Esc cancels"
     bl_options = {"UNDO", "BLOCKING"}
 
     axis: bpy.props.EnumProperty(items=tuple((axis, axis, "")
@@ -81,14 +95,15 @@ class SPLINE_MAKER_OT_move_drag(bpy.types.Operator):
     def invoke(self, context, event):
         global _active
         self.obj, self.data = context.edit_object, context.edit_object.data
+        selected = {point.as_pointer() for point in selected_anchors(context)}
         self.points = [(si, pi, snapshot(point))
                        for si, spline in enumerate(self.data.splines) if spline.type == "BEZIER"
-                       for pi, point in enumerate(spline.bezier_points) if not point.hide and point.select_control_point]
+                       for pi, point in enumerate(spline.bezier_points) if point.as_pointer() in selected]
         self.region_key = tuple(x.as_pointer() for x in (context.window, context.area, context.region))
         if abs(self.obj.matrix_world.determinant()) < 1e-12:
             return {"CANCELLED"}
         self.inverse = self.obj.matrix_world.inverted().to_3x3()
-        self.origin = self.obj.matrix_world @ self.points[0][2][0]
+        self.origin = self.obj.matrix_world @ move_origin(context)
         view_normal = context.region_data.view_rotation @ Vector((0, 0, 1))
         self.direction = None
         if self.axis in {"X", "Y", "Z"}:
@@ -110,7 +125,7 @@ class SPLINE_MAKER_OT_move_drag(bpy.types.Operator):
         self.changed = False
         _active = self
         context.window_manager.modal_handler_add(self)
-        context.area.header_text_set("Move vertices: release to confirm; Esc/right-click to cancel")
+        context.area.header_text_set("Move selection: release to confirm; Esc/right-click to cancel")
         context.area.tag_redraw()
         return {"RUNNING_MODAL"}
 

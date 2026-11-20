@@ -152,9 +152,15 @@ class SPLINE_MAKER_OT_draw_spline(bpy.types.Operator):
             self.report({"INFO"}, message)
             return {"RUNNING_MODAL"}
         try:
-            commit_curve(context, self.session, closed=closed)
+            obj = commit_curve(context, self.session, closed=closed)
+            from .region_selection import select_whole
+            select_whole(obj.data, True)
+            context.window_manager.spline_maker_selection_level = "WHOLE"
         finally:
             self.cleanup()
+        bpy.ops.wm.tool_set_by_id(name="builtin.select_box", space_type="VIEW_3D")
+        if context.area is not None:
+            context.area.tag_redraw()
         return {"FINISHED"}
 
     def project(self, context, pixel):

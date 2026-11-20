@@ -35,6 +35,18 @@ def main(archive):
     assert_tangent_transforms(module.tangent_drag, module.feasibility)
     assert_tool_switching(module.feasibility)
     assert_edit_interactions(module.edit_drag, module.vertex_selection, module.feasibility)
+    sys.path.insert(0, str(Path(__file__).parent))
+    from segment_checks import run as check_segments
+    check_segments(module)
+    from region_checks import run as check_regions
+    check_regions(module)
+    from control_checks import run as check_controls
+    check_controls(module)
+    from whole_move_checks import run as check_whole_move
+    check_whole_move(module)
+    assert_finish_edit(module)
+    assert_enter_edit(module)
+    assert_object_display(module)
     assert bpy.ops.preferences.addon_disable(module=module_name) == {"FINISHED"}
     assert_disabled(module, menu)
     assert bpy.ops.preferences.addon_enable(module=module_name) == {"FINISHED"}
@@ -49,6 +61,19 @@ def assert_enabled(module, menu):
     assert all(is_registered(cls) for cls in module.CLASSES)
     assert menu.draw._draw_funcs.count(module.ui.draw_curve_add_menu) == 1
     keymaps = bpy.context.window_manager.keyconfigs.addon.keymaps
+    assert bpy.context.window_manager.spline_maker_selection_level == "VERTEX"
+    for name in ("Curve", "3D View"):
+        assert {(item.type, item.value) for item in keymaps[name].keymap_items
+                if item.idname == "spline_maker.exit_edit_shortcut"} == {("ESC", "PRESS"), ("FOUR", "PRESS")}
+        assert {(item.type, item.properties.target) for item in keymaps[name].keymap_items
+                if item.idname in {"spline_maker.selection_level", "spline_maker.enter_selection_level"}} == {("ONE", "VERTEX"), ("TWO", "SEGMENT"), ("THREE", "REGION")}
+        assert not any(item.type == "FIVE" and item.idname.startswith("spline_maker.")
+                       for item in keymaps[name].keymap_items)
+        assert {(item.type, item.properties.target) for item in keymaps[name].keymap_items
+                if item.idname == "spline_maker.enter_selection_level"} == {("ONE", "VERTEX"), ("TWO", "SEGMENT"), ("THREE", "REGION")}
+    for name in ("Object Mode", "Curve", "3D View"):
+        assert [(item.type, item.value) for item in keymaps[name].keymap_items
+                if item.idname == "spline_maker.enter_edit"] == [("SIX", "PRESS")]
     for tool in module.feasibility.WORKSPACE_TOOLS:
         assert tool.bl_widget == "VIEW3D_GGT_spline_maker_transform"
         items = keymaps[tool._bl_tool.keymap[0]].keymap_items
@@ -108,6 +133,12 @@ def assert_disabled(module, menu):
     assert module.edit_drag._active is None
     assert module.vertex_selection._gesture is None
     assert not module.transform_gizmos._groups
+    assert not module.segment_selection._bindings
+    assert not module.feasibility._curve_shortcuts
+    assert not hasattr(bpy.types.WindowManager, "spline_maker_selection_level")
+    assert not hasattr(bpy.types.WindowManager, "spline_maker_curve_color")
+    assert not hasattr(bpy.types.WindowManager, "spline_maker_bright_curves")
+    assert module.display._handler is None
     keymaps = bpy.context.window_manager.keyconfigs.addon.keymaps
     assert not any("Spline Maker" in keymap.name for keymap in keymaps)
     assert not any(item.idname == "spline_maker.tool_shortcut"
@@ -116,6 +147,119 @@ def assert_disabled(module, menu):
                    for item in keymaps["3D View"].keymap_items)
     assert not any(item.idname == "spline_maker.vertex_context_menu"
                    for item in keymaps["Curve"].keymap_items)
+    for name in ("Curve", "3D View"):
+        assert not any(item.idname == "spline_maker.exit_edit_shortcut" for item in keymaps[name].keymap_items)
+    for name in ("Object Mode", "Curve", "3D View"):
+        assert not any(item.idname == "spline_maker.enter_edit" for item in keymaps[name].keymap_items)
+
+
+def assert_enter_edit(module):
+    area = next(a for a in bpy.context.window.screen.areas if a.type == "VIEW_3D")
+    region = next(r for r in area.regions if r.type == "WINDOW")
+    with bpy.context.temp_override(area=area, region=region):
+        bpy.ops.object.select_all(action="DESELECT")
+        assert not bpy.ops.spline_maker.enter_edit.poll()
+        bpy.ops.mesh.primitive_cube_add()
+        mesh = bpy.context.object
+        assert not bpy.ops.spline_maker.enter_edit.poll()
+        bpy.ops.object.mode_set(mode="EDIT")
+        assert not bpy.ops.spline_maker.enter_edit.poll()
+        bpy.ops.object.mode_set(mode="OBJECT")
+        bpy.ops.spline_maker.add_test_curve()
+        obj = bpy.context.object
+        mesh.select_set(True)
+        assert not bpy.ops.spline_maker.enter_edit.poll()
+        mesh.select_set(False)
+        poly = obj.data.splines.new("POLY")
+        assert not bpy.ops.spline_maker.enter_edit.poll()
+        obj.data.splines.remove(poly)
+        before = [module.edit_drag.snapshot(p) for p in obj.data.splines[0].bezier_points]
+        objects = set(bpy.data.objects.keys())
+        for _ in range(2):
+            assert bpy.ops.spline_maker.enter_edit.poll()
+            assert bpy.ops.spline_maker.enter_edit() == {"FINISHED"}
+            assert bpy.context.mode == "EDIT_CURVE" and bpy.context.edit_object == obj
+            assert module.feasibility.active_mode(bpy.context) == "SELECT"
+            assert module.segment_selection.level(bpy.context) == "VERTEX"
+            # 6 also enters vertex editing from a native tool or another level.
+            bpy.ops.spline_maker.selection_level(target="WHOLE")
+            bpy.ops.wm.tool_set_by_id(name="builtin.select_box")
+            assert bpy.ops.spline_maker.enter_edit() == {"FINISHED"}
+            assert module.feasibility.active_mode(bpy.context) == "SELECT"
+            assert module.segment_selection.level(bpy.context) == "VERTEX"
+            assert bpy.ops.spline_maker.exit_edit_shortcut() == {"FINISHED"}
+            assert bpy.context.mode == "OBJECT" and bpy.context.object == obj and obj.select_get()
+            assert [module.edit_drag.snapshot(p) for p in obj.data.splines[0].bezier_points] == before
+            assert set(bpy.data.objects.keys()) == objects
+        print("6 Edit Spline entry/exit and unsupported-context guards passed")
+
+
+def assert_finish_edit(module):
+    area = next(a for a in bpy.context.window.screen.areas if a.type == "VIEW_3D")
+    region = next(r for r in area.regions if r.type == "WINDOW")
+    with bpy.context.temp_override(area=area, region=region):
+        bpy.ops.spline_maker.add_test_curve()
+        obj = bpy.context.object
+        points = obj.data.splines[0].bezier_points
+        points.add(1)
+        obj.data.splines[0].use_cyclic_u = True
+        for p, co in zip(points, ((-2, -1, 0), (2, -1, 0), (0, 2, 0))):
+            p.co = co
+            p.handle_left_type = p.handle_right_type = "FREE"
+            p.handle_left = p.handle_right = p.co
+        original_name = obj.name
+        before_objects = set(bpy.data.objects.keys())
+        before = [module.edit_drag.snapshot(p) for p in points]
+        for level in ("VERTEX", "SEGMENT", "REGION", "WHOLE"):
+            for index, (_, mode, _) in enumerate(module.feasibility.TOOLS):
+                assert bpy.ops.object.mode_set(mode="EDIT") == {"FINISHED"}
+                bpy.ops.wm.tool_set_by_id(name="builtin.select_box")
+                assert not bpy.ops.spline_maker.exit_edit_shortcut.poll()
+                assert bpy.ops.spline_maker.finish_edit.poll()
+                bpy.ops.spline_maker.switch_tangent_tool(target=mode)
+                bpy.ops.spline_maker.selection_level(target=level)
+                assert bpy.ops.spline_maker.exit_edit_shortcut.poll()
+                result = (bpy.ops.spline_maker.finish_edit() if index % 2 == 0
+                          else bpy.ops.spline_maker.exit_edit_shortcut())
+                assert result == {"FINISHED"} and bpy.context.mode == "OBJECT"
+                assert bpy.context.object.name == original_name and bpy.context.object.select_get()
+                assert set(bpy.data.objects.keys()) == before_objects
+                assert [module.edit_drag.snapshot(p) for p in bpy.context.object.data.splines[0].bezier_points] == before
+                for workspace_mode in ("OBJECT", "EDIT_CURVE"):
+                    assert bpy.context.workspace.tools.from_space_view3d_mode(workspace_mode).idname == "builtin.select_box"
+                assert bpy.context.window_manager.spline_maker_selection_level == "VERTEX"
+                assert not bpy.ops.spline_maker.exit_edit_shortcut.poll()
+                assert not bpy.ops.spline_maker.finish_edit.poll()
+                assert module.vertex_selection._gesture is None
+                assert module.edit_drag._active is None and module.tangent_drag._active is None
+        print("Finish Editing passed from Q/W/E/R and all four selection levels")
+
+
+def assert_object_display(module):
+    area = next(a for a in bpy.context.window.screen.areas if a.type == "VIEW_3D")
+    region = next(r for r in area.regions if r.type == "WINDOW")
+    with bpy.context.temp_override(area=area, region=region):
+        bpy.ops.spline_maker.add_test_curve()
+        obj = bpy.context.object
+        obj.select_set(False)
+        bpy.context.view_layer.update()
+        assert module.display.active(bpy.context)
+        assert obj in module.display.object_curves(bpy.context)
+        obj.hide_set(True)
+        bpy.context.view_layer.update()
+        assert obj not in module.display.object_curves(bpy.context)
+        obj.hide_set(False)
+        obj.select_set(True)
+        bpy.context.view_layer.update()
+        assert obj not in module.display.object_curves(bpy.context)
+        # Hidden edit control points still contribute to the Object Mode curve.
+        point = obj.data.splines[0].bezier_points[0]
+        point.hide = True
+        project = lambda p: (p.x, p.y)
+        assert not module.segment_selection.projected_segments(obj.data, obj.matrix_world, project)[0:1]
+        projected = module.segment_selection.projected_segments(obj.data, obj.matrix_world, project, include_hidden=True)
+        assert len(projected) == 1 and projected[0][1]
+        point.hide = False
 
 
 def assert_vertex_types(types, editing):
@@ -133,6 +277,7 @@ def assert_vertex_types(types, editing):
             point.handle_left = point.co + Vector((-0.8, -0.3, 0))
             point.handle_right = point.co + Vector((1.2, 0.8, 0))
         assert bpy.ops.object.mode_set(mode="EDIT") == {"FINISHED"}
+        bpy.context.window_manager.spline_maker_selection_level = "VERTEX"
         try:
             assert bpy.ops.wm.tool_set_by_id(name="builtin.select_box") == {"FINISHED"}
             assert not bpy.ops.spline_maker.vertex_type.poll()
@@ -192,6 +337,7 @@ def assert_tool_switching(editing):
         bpy.ops.spline_maker.add_test_curve()
         obj = bpy.context.object
         bpy.ops.object.mode_set(mode="EDIT")
+        bpy.context.window_manager.spline_maker_selection_level = "VERTEX"
         try:
             bpy.ops.curve.select_all(action="DESELECT")
             first = obj.data.splines[0].bezier_points[0]
@@ -224,6 +370,11 @@ def assert_tool_switching(editing):
                 assert bpy.utils.keyconfig_set(str(preset))
                 keyconfigs = bpy.context.window_manager.keyconfigs
                 keyconfigs.update()
+                for name in ("Object Mode", "Curve", "3D View"):
+                    match = next(item for item in keyconfigs.user.keymaps[name].keymap_items
+                                 if item.active and item.type == "SIX" and item.value == "PRESS"
+                                 and not (item.shift or item.ctrl or item.alt or item.oskey))
+                    assert match.idname == "spline_maker.enter_edit", (name, match.idname)
                 for name in ("Curve", "3D View"):
                     items = keyconfigs.user.keymaps[name].keymap_items
                     for key, _, _ in editing.TOOLS:
@@ -231,6 +382,11 @@ def assert_tool_switching(editing):
                                      if item.active and item.type == key and item.value == "PRESS"
                                      and not (item.shift or item.ctrl or item.alt or item.oskey))
                         assert match.idname == "spline_maker.tool_shortcut", (name, key, match.idname)
+                    for key in ("ONE", "TWO", "THREE"):
+                        match = next(item for item in items if item.active and item.type == key
+                                     and item.value == "PRESS"
+                                     and not (item.shift or item.ctrl or item.alt or item.oskey))
+                        assert match.idname == "spline_maker.enter_selection_level"
             finally:
                 bpy.context.window_manager.keyconfigs.active = bpy.context.window_manager.keyconfigs[previous]
         finally:
@@ -247,6 +403,7 @@ def assert_tangent_transforms(drag, editing):
         obj.rotation_euler.z = 0.4
         bpy.context.view_layer.update()
         bpy.ops.object.mode_set(mode="EDIT")
+        bpy.context.window_manager.spline_maker_selection_level = "VERTEX"
         try:
             bpy.ops.wm.tool_set_by_id(name=editing.tool_id("ROTATE"))
             first, second = obj.data.splines[0].bezier_points
@@ -302,6 +459,7 @@ def assert_vertex_selection(picking, editing):
         obj.scale = (1.5, 0.75, 2.0)
         bpy.context.view_layer.update()
         assert bpy.ops.object.mode_set(mode="EDIT") == {"FINISHED"}
+        bpy.context.window_manager.spline_maker_selection_level = "VERTEX"
         try:
             assert bpy.ops.wm.tool_set_by_id(name="builtin.select_box") == {"FINISHED"}
             assert not bpy.ops.spline_maker.vertex_select.poll()
@@ -366,6 +524,7 @@ def assert_edit_interactions(drag, picking, editing):
         bpy.ops.spline_maker.add_test_curve()
         obj = bpy.context.object
         bpy.ops.object.mode_set(mode="EDIT")
+        bpy.context.window_manager.spline_maker_selection_level = "VERTEX"
         first, second = obj.data.splines[0].bezier_points
         fake = SimpleNamespace(
             mode="EDIT_CURVE", edit_object=obj, objects_in_mode=[obj], workspace=bpy.context.workspace,
@@ -523,7 +682,7 @@ def assert_drawing_probe(probe, editing):
     with bpy.context.temp_override(area=area, region=region):
         assert bpy.ops.wm.tool_set_by_id(name="builtin.select_box") == {"FINISHED"}
         assert not bpy.ops.spline_maker.exit_draw_tool.poll()
-        assert bpy.ops.wm.tool_set_by_id(name=probe.SplineMakerDrawTool.bl_idname) == {"FINISHED"}
+        assert bpy.ops.wm.tool_set_by_id(name=probe.SplineMakerDrawTool.bl_idname, space_type="VIEW_3D") == {"FINISHED"}
         assert bpy.ops.spline_maker.exit_draw_tool() == {"FINISHED"}
         assert bpy.context.workspace.tools.from_space_view3d_mode("OBJECT").idname == "builtin.select_box"
 
@@ -566,7 +725,9 @@ def assert_drawing_probe(probe, editing):
     second = Vector((3, 2, 0))
     session.place(second)
     session.place(second)
+    assert bpy.ops.wm.tool_set_by_id(name=probe.SplineMakerDrawTool.bl_idname, space_type="VIEW_3D") == {"FINISHED"}
     assert probe.SPLINE_MAKER_OT_draw_spline.finish(operator, bpy.context) == {"FINISHED"}
+    assert bpy.context.workspace.tools.from_space_view3d_mode("OBJECT").idname == "builtin.select_box"
     assert not session.points
     obj = bpy.context.view_layer.objects.active
     assert set(bpy.data.objects) - before == {obj}
@@ -582,6 +743,7 @@ def assert_drawing_probe(probe, editing):
 
     with bpy.context.temp_override(area=area, region=region):
         assert bpy.ops.object.mode_set(mode="EDIT") == {"FINISHED"}
+        bpy.context.window_manager.spline_maker_selection_level = "VERTEX"
         try:
             bpy.ops.curve.select_all(action="DESELECT")
             anchor, neighbor = obj.data.splines[0].bezier_points
@@ -637,6 +799,7 @@ def assert_mixed_spline(probe):
     region = next(region for region in area.regions if region.type == "WINDOW")
     with bpy.context.temp_override(area=area, region=region):
         assert bpy.ops.object.mode_set(mode="EDIT") == {"FINISHED"}
+        bpy.context.window_manager.spline_maker_selection_level = "VERTEX"
         try:
             bpy.ops.curve.select_all(action="DESELECT")
             middle = obj.data.splines[0].bezier_points[1]
@@ -720,6 +883,7 @@ def assert_closing_spline(probe):
         return operator_class.modal(operator, context, event)
 
     probe._active = operator
+    assert bpy.ops.wm.tool_set_by_id(name=probe.SplineMakerDrawTool.bl_idname, space_type="VIEW_3D") == {"FINISHED"}
     try:
         assert send("LEFTMOUSE") == {"RUNNING_MODAL"}
         assert send("LEFTMOUSE", "RELEASE") == {"RUNNING_MODAL"}
@@ -742,6 +906,7 @@ def assert_closing_spline(probe):
 
     obj = bpy.context.view_layer.objects.active
     assert not session.points and set(bpy.data.objects) - before == {obj}
+    assert bpy.context.workspace.tools.from_space_view3d_mode("OBJECT").idname == "builtin.select_box"
     bpy.context.view_layer.update()
     spline = obj.data.splines[0]
     assert spline.use_cyclic_u and len(spline.bezier_points) == 3
@@ -800,6 +965,7 @@ def assert_probe(probe):
         obj = bpy.context.object
         assert obj.type == "CURVE"
         assert bpy.ops.object.mode_set(mode="EDIT") == {"FINISHED"}
+        bpy.context.window_manager.spline_maker_selection_level = "VERTEX"
         try:
             bpy.ops.curve.select_all(action="DESELECT")
             point, neighbor = obj.data.splines[0].bezier_points
