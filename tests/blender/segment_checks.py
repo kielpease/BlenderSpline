@@ -110,8 +110,8 @@ def run(module):
                 bpy.ops.spline_maker.switch_tangent_tool(target=target)
                 assert seg.selected(data) == {(0, 0), (0, 1)}
                 if target in {"ROTATE", "SCALE"}:
-                    assert not bpy.ops.spline_maker.tangent_drag.poll()
-                    assert not bpy.ops.spline_maker.tangent_step.poll()
+                    assert bpy.ops.spline_maker.tangent_drag.poll()
+                    assert bpy.ops.spline_maker.tangent_step.poll()
 
             data.splines[0].use_cyclic_u = True
             assert len(list(seg.segments(data))) == 6

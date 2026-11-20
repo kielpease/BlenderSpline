@@ -184,6 +184,32 @@ An installed 5.2.4 LTS check changed object location between native Curve Edit u
 
 The owner accepted Whole curve Move in 0.14.0, completing SM-014. The Segment box correction requires its own viewport check.
 
+## SM-015 selection-center Rotate/Scale (0.15.0)
+
+The accepted 0.14.1 selection/Move version was committed and pushed as `5807157` before beginning this task. `tangent_drag.py` now resolves composite selection through `edit_drag.selected_anchors`, capturing each native point once by spline/point index. The same modal operator handles both existing vertex-tangent transforms and composite geometry transforms. A non-null local pivot selects the geometry path: anchors and both handles are transformed from the original snapshot about the average of selected anchors. The snapshot now restores anchors as well as handles/types. Vertex mode continues to transform tangents about their own anchors.
+
+World rotation/axis-scale matrices are conjugated through the object's world matrix, accounting for rotation, nonuniform scale and parent transforms. Source geometry stays in native Curve Edit undo and the object matrix is unchanged, matching the SM-014 decision. Composite transforms retain handle types; native Auto/Vector tangent recalculation still applies. The existing step operator shares the same snapshot/math path. Composite steps use global Z rotation and uniform scale; the accepted Vertex step stays local Z.
+
+The gizmo group no longer suppresses composite E/R controls, and hides every control during either Move or Rotate/Scale preview. Polls reject empty/unsupported selections. Edge-on rotation planes and view-aligned scale axes cancel safely with a reason. Orthographic ray origins now use the installed API's zero far-clip clamp and an analytic line/plane intersection; this avoids the precision loss found by the new axis-rotation checks while preserving shared Move/interior picking.
+
+`transform_checks.py` covers centered math, shared endpoints, unselected geometry, parent transforms, hidden Whole points, all rotation/scale controls, noncompounding preview, cancellation, no-op/identity restoration, tool-change/unregister rollback, type preservation and native Undo/Redo for drags and step buttons. Physical gizmo dispatch, rendered preview, panel layout and actual undo grouping require the SM-015 viewport procedure.
+
+## 0.15.1 Select entry and shortcut priority
+
+The owner accepted the 0.15.0 transform workflow but reported native Select Box on re-entry and Q failing to activate Spline Maker. Object Mode 1 previously used Blender's native mode entry, and `tool_shortcut.poll` deliberately rejected Q in native Edit tools. A dedicated `select_shortcut` now permits the supported Curve Edit context and delegates to the same Select switch as the button; W/E/R retain their existing active-tool guard.
+
+A separate Object-only `enter_vertex_edit` shortcut delegates to the existing `enter_edit` action. It binds 1 in Object Non-modal, Object Mode and 3D View, while 6 entry now also binds Object Non-modal. The Object-only poll lets existing Curve Edit 1 level selection continue unchanged. Native/unsupported contexts fail these polls. Tool activation specifies VIEW_3D explicitly and redraws every area region. All bindings remain in the existing unregister registry; there are no mode handlers or timers.
+
+`entry_checks.py` resolves applicable operators from the real merged default/Industry Compatible maps, exercising repeated 1/6 entry after both native and Spline Maker exits, Q from native tools and custom W/E/R, preservation of geometry/level/selection, the panel draw path's pressed Q button, and unsupported/no-selection guards. This strengthens operator/keymap coverage without claiming physical event delivery or rendered-panel verification.
+
+## 0.15.2 offset XY scale square
+
+`transform_gizmos.py` adds a tool-owned native primitive PLANE gizmo with an offset in positive XY and a SCALE/XY operator target. It is visible in composite Scale levels only, sharing the selection center and live-preview hiding rules. The existing XYZ boxes and uniform center keep their mappings.
+
+`tangent_drag.py` accepts XY and uses a screen-space projection of the world XY diagonal for its signed drag factor. A diagonal matrix `(factor, factor, 1)` is conjugated through the object's world matrix and applied to the original geometry snapshot. No scale is baked into the object's transform. Edge-on XY views cancel before modal entry. The scale factor and snapshot lifecycle reuse the existing operator.
+
+Focused checks cover the real gizmo setup's operator routing and visibility using synthetic controls, XY preview math under parent/nonuniform transforms, stable Z, repeated updates, cancel and native Undo/Redo. They do not verify rendered size, placement or physical picking. The owner accepted the prior 0.15.1 entry fixes overall.
+
 ## Later geometry
 
 Profile generation may use Geometry Nodes or a controlled mesh generator. Choose after testing planar corner joins and alignment. Do not assume a rectangular Curve to Mesh sweep alone preserves wall thickness at every corner. Source curve remains editable; generated geometry is derived output. Height and width stay unit-aware settings independent of path vertex edits.

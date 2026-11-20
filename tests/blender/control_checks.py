@@ -36,6 +36,12 @@ def run(module):
             controls = [(SimpleNamespace(hide=False), mode, Matrix.Identity(4), False)
                         for mode in ("MOVE", "ROTATE", "SCALE")]
             group = SimpleNamespace(controls=controls)
+            full_group = SimpleNamespace(gizmos=Gizmos())
+            module.transform_gizmos.VIEW3D_GGT_spline_maker_transform.setup(full_group, bpy.context)
+            assert full_group.xy_scale.operator == "spline_maker.tangent_drag"
+            assert full_group.xy_scale.props.mode == "SCALE" and full_group.xy_scale.props.axis == "XY"
+            assert full_group.xy_scale.matrix_offset.translation.x > 0
+            assert full_group.xy_scale.matrix_offset.translation.y > 0
             geometry = [module.edit_drag.snapshot(p) for p in obj.data.splines[0].bezier_points]
 
             def state():
@@ -62,10 +68,10 @@ def run(module):
                         assert state() == selection
                         assert [module.edit_drag.snapshot(p) for p in obj.data.splines[0].bezier_points] == geometry
                         module.transform_gizmos.VIEW3D_GGT_spline_maker_transform.draw_prepare(group, bpy.context)
+                        module.transform_gizmos.VIEW3D_GGT_spline_maker_transform.draw_prepare(full_group, bpy.context)
+                        assert full_group.xy_scale.hide == (target != "SCALE" or level == "VERTEX")
                         visible = {mode for control, mode, _, _ in controls if not control.hide}
-                        expected = ({target} if level == "VERTEX" and target != "SELECT"
-                                    else {"MOVE"} if level in {"SEGMENT", "REGION", "WHOLE"} and target == "MOVE"
-                                    else set())
+                        expected = {target} if target != "SELECT" else set()
                         assert visible == expected, (level, target, visible)
                         for control, _, _, _ in controls:
                             if not control.hide:
@@ -89,6 +95,21 @@ def run(module):
         print("SM-013 entry, all-level tool parity, selection preservation and gizmo visibility state passed")
 
 
+class Gizmos:
+    """Capture operator routing and visibility without verifying GPU output."""
+
+    def new(self, kind):
+        gizmo = SimpleNamespace(matrix_offset=Matrix.Identity(4))
+
+        def target(name):
+            gizmo.operator = name
+            gizmo.props = SimpleNamespace()
+            return gizmo.props
+
+        gizmo.target_set_operator = target
+        return gizmo
+
+
 class Layout:
     """Capture operator availability without claiming to verify panel rendering."""
 
@@ -99,7 +120,7 @@ class Layout:
         return self
 
     def operator(self, name, **kwargs):
-        op = SimpleNamespace()
+        op = SimpleNamespace(ui_kwargs=kwargs)
         self.operators.append((name, op))
         return op
 

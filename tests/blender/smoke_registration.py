@@ -44,6 +44,10 @@ def main(archive):
     check_controls(module)
     from whole_move_checks import run as check_whole_move
     check_whole_move(module)
+    from transform_checks import run as check_transforms
+    check_transforms(module)
+    from entry_checks import run as check_entry
+    check_entry(module)
     assert_finish_edit(module)
     assert_enter_edit(module)
     assert_object_display(module)
@@ -71,24 +75,30 @@ def assert_enabled(module, menu):
                        for item in keymaps[name].keymap_items)
         assert {(item.type, item.properties.target) for item in keymaps[name].keymap_items
                 if item.idname == "spline_maker.enter_selection_level"} == {("ONE", "VERTEX"), ("TWO", "SEGMENT"), ("THREE", "REGION")}
-    for name in ("Object Mode", "Curve", "3D View"):
+    for name in ("Object Non-modal", "Object Mode", "Curve", "3D View"):
         assert [(item.type, item.value) for item in keymaps[name].keymap_items
                 if item.idname == "spline_maker.enter_edit"] == [("SIX", "PRESS")]
     for tool in module.feasibility.WORKSPACE_TOOLS:
         assert tool.bl_widget == "VIEW3D_GGT_spline_maker_transform"
         items = keymaps[tool._bl_tool.keymap[0]].keymap_items
-        assert [(item.type, item.idname, item.properties.target) for item in items] == [
-            (key, "spline_maker.tool_shortcut", mode)
+        assert [(item.type, item.idname) for item in items] == [
+            (key, "spline_maker.select_shortcut" if mode == "SELECT" else "spline_maker.tool_shortcut")
             for key, mode, _ in module.feasibility.TOOLS
         ]
     assert {
         (item.type, item.properties.target) for item in keymaps["Curve"].keymap_items
         if item.idname == "spline_maker.tool_shortcut"
-    } == {(key, mode) for key, mode, _ in module.feasibility.TOOLS}
+    } == {(key, mode) for key, mode, _ in module.feasibility.TOOLS if mode != "SELECT"}
     assert {
         (item.type, item.properties.target) for item in keymaps["3D View"].keymap_items
         if item.idname == "spline_maker.tool_shortcut"
-    } == {(key, mode) for key, mode, _ in module.feasibility.TOOLS}
+    } == {(key, mode) for key, mode, _ in module.feasibility.TOOLS if mode != "SELECT"}
+    for name in ("Curve", "3D View"):
+        assert [(item.type, item.value) for item in keymaps[name].keymap_items
+                if item.idname == "spline_maker.select_shortcut"] == [("Q", "PRESS")]
+    for name in ("Object Non-modal", "Object Mode", "3D View"):
+        assert [(item.type, item.value) for item in keymaps[name].keymap_items
+                if item.idname == "spline_maker.enter_vertex_edit"] == [("ONE", "PRESS")]
     assert {
         (item.type, item.value, item.shift) for item in keymaps["Curve"].keymap_items
         if item.idname == "spline_maker.vertex_select"
@@ -111,7 +121,8 @@ def assert_enabled(module, menu):
                 item.shift or item.ctrl or item.alt or item.oskey
             )
         )
-        assert first_match.idname == "spline_maker.tool_shortcut", first_match.idname
+        assert first_match.idname == ("spline_maker.select_shortcut" if key == "Q"
+                                      else "spline_maker.tool_shortcut"), first_match.idname
 
     area = next(area for area in bpy.context.window.screen.areas if area.type == "VIEW_3D")
     with bpy.context.temp_override(area=area):
@@ -149,8 +160,9 @@ def assert_disabled(module, menu):
                    for item in keymaps["Curve"].keymap_items)
     for name in ("Curve", "3D View"):
         assert not any(item.idname == "spline_maker.exit_edit_shortcut" for item in keymaps[name].keymap_items)
-    for name in ("Object Mode", "Curve", "3D View"):
-        assert not any(item.idname == "spline_maker.enter_edit" for item in keymaps[name].keymap_items)
+    for name in ("Object Non-modal", "Object Mode", "Curve", "3D View"):
+        assert not any(item.idname in {"spline_maker.enter_edit", "spline_maker.enter_vertex_edit",
+                                      "spline_maker.select_shortcut"} for item in keymaps[name].keymap_items)
 
 
 def assert_enter_edit(module):
@@ -370,7 +382,7 @@ def assert_tool_switching(editing):
                 assert bpy.utils.keyconfig_set(str(preset))
                 keyconfigs = bpy.context.window_manager.keyconfigs
                 keyconfigs.update()
-                for name in ("Object Mode", "Curve", "3D View"):
+                for name in ("Object Non-modal", "Object Mode", "Curve", "3D View"):
                     match = next(item for item in keyconfigs.user.keymaps[name].keymap_items
                                  if item.active and item.type == "SIX" and item.value == "PRESS"
                                  and not (item.shift or item.ctrl or item.alt or item.oskey))
@@ -381,12 +393,14 @@ def assert_tool_switching(editing):
                         match = next(item for item in items
                                      if item.active and item.type == key and item.value == "PRESS"
                                      and not (item.shift or item.ctrl or item.alt or item.oskey))
-                        assert match.idname == "spline_maker.tool_shortcut", (name, key, match.idname)
+                        assert match.idname == ("spline_maker.select_shortcut" if key == "Q"
+                                               else "spline_maker.tool_shortcut"), (name, key, match.idname)
                     for key in ("ONE", "TWO", "THREE"):
                         match = next(item for item in items if item.active and item.type == key
                                      and item.value == "PRESS"
                                      and not (item.shift or item.ctrl or item.alt or item.oskey))
-                        assert match.idname == "spline_maker.enter_selection_level"
+                        assert match.idname == ("spline_maker.enter_vertex_edit" if key == "ONE" and name == "3D View"
+                                               else "spline_maker.enter_selection_level")
             finally:
                 bpy.context.window_manager.keyconfigs.active = bpy.context.window_manager.keyconfigs[previous]
         finally:

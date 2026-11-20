@@ -4,7 +4,7 @@ import bpy
 from mathutils import Matrix, Vector
 
 from .feasibility import active_mode, move_origin
-from . import edit_drag
+from . import edit_drag, tangent_drag
 
 _groups = {}
 
@@ -77,6 +77,19 @@ class VIEW3D_GGT_spline_maker_transform(bpy.types.GizmoGroup):
             pad.use_draw_modal = False
             pad.target_set_operator("spline_maker.move_drag").axis = plane
             self.controls.append((pad, "MOVE", basis, False))
+        # Offset XY scale square gives a planar drag away from the center.
+        self.xy_scale = self.gizmos.new("GIZMO_GT_primitive_3d")
+        self.xy_scale.draw_style = "PLANE"
+        self.xy_scale.color = (0.2, 0.2, 0.9)
+        self.xy_scale.color_highlight = (1.0, 1.0, 0.65)
+        self.xy_scale.alpha, self.xy_scale.alpha_highlight = 0.55, 1.0
+        self.xy_scale.scale_basis = 0.15
+        self.xy_scale.use_draw_offset_scale = True
+        self.xy_scale.matrix_offset.translation = (3.5, 3.5, 0)
+        self.xy_scale.use_draw_modal = False
+        props = self.xy_scale.target_set_operator("spline_maker.tangent_drag")
+        props.mode, props.axis = "SCALE", "XY"
+        self.controls.append((self.xy_scale, "SCALE", Matrix.Identity(4), False))
         # White outer ring rotates in the view plane; white center box scales
         # uniformly, supplementing the usual red/green/blue axis controls.
         for mode in ("MOVE", "ROTATE", "SCALE"):
@@ -102,12 +115,12 @@ class VIEW3D_GGT_spline_maker_transform(bpy.types.GizmoGroup):
         mode = active_mode(context)
         origin = move_origin(context)
         from .segment_selection import composite
-        if composite(context) and mode in {"ROTATE", "SCALE"}:
-            origin = None
         for gizmo, target, basis, view_facing in self.controls:
             # The drag owns the live preview. Do not draw a second, offset
             # native arrow while the operation is moving the selection.
-            gizmo.hide = origin is None or mode != target or edit_drag._active is not None
+            gizmo.hide = (origin is None or mode != target or edit_drag._active is not None
+                          or tangent_drag._active is not None
+                          or (gizmo is getattr(self, "xy_scale", None) and not composite(context)))
             if not gizmo.hide:
                 gizmo.matrix_basis = (
                     context.region_data.view_rotation.to_matrix().to_4x4()

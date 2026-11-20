@@ -3,7 +3,6 @@
 import bpy
 from bpy_extras.view3d_utils import region_2d_to_origin_3d, region_2d_to_vector_3d
 from mathutils import Vector
-from mathutils.geometry import intersect_line_plane
 
 from .feasibility import active_mode, editable_bezier_points, move_origin
 
@@ -11,11 +10,15 @@ _active = None
 
 
 def project(context, pixel, origin, normal):
-    start = region_2d_to_origin_3d(context.region, context.region_data, pixel)
+    # Orthographic lines need no far-clip offset. Keep the origin near the
+    # view and use the direction directly to avoid losing precision in a
+    # distant (start + direction) endpoint.
+    start = region_2d_to_origin_3d(context.region, context.region_data, pixel, clamp=0.0)
     direction = region_2d_to_vector_3d(context.region, context.region_data, pixel)
-    if abs(direction.dot(normal)) < 1e-7:
+    denominator = direction.dot(normal)
+    if abs(denominator) < 1e-7:
         return None
-    return intersect_line_plane(start, start + direction, origin, normal)
+    return start + direction * ((origin - start).dot(normal) / denominator)
 
 
 def snapshot(point):

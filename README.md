@@ -2,7 +2,7 @@
 
 Spline Maker is a Blender extension for drawing and editing native Bezier curves, inspired by the direct spline modeling workflow of 3ds Max.
 
-**Status:** Move and the 0.14.1 Segment box correction are accepted by the owner. Segment boxes select any curve span touched or crossed by the box. ZIP validation and the full background suite pass on Blender 5.2.4 LTS. Next is SM-015: Segment/Spline Rotate and Scale about the selection center.
+**Status:** Version 0.15.2 is accepted, including the offset XY scale square, Move/Rotate/Scale and Q Select entry fixes. ZIP validation and the full background suite pass on Blender 5.2.4 LTS. Next is SM-016 interaction integration: navigation, cancel, native Undo grouping, context menus and tool exit. See `AGENTS.md` for the home-session handoff and `docs/BUILD.md` to rebuild the Git-ignored test ZIP.
 
 Primary test target: Blender 5.2.4 LTS on Windows. Compatibility beyond that version is unverified.
 
@@ -24,10 +24,12 @@ Draw and edit mixed straight/Bézier outlines without memorizing an add-on-speci
 | 4 | Return to Object Mode |
 | Whole curve button | Select all source splines, then W moves their geometry together |
 | 5 | Preserve the owner's native Blender mode control |
-| 6 / Edit Spline button | Enter Spline Maker Vertex editing for a single selected editable Bezier curve |
+| 1 or 6 from Object Mode / Edit Spline button | Enter Vertex editing with Q Select active for a single selected editable Bezier curve |
 | Right click while editing | Vertex types and other selection-relevant commands |
 
 Shortcuts supplement visible controls. They must be scoped to Spline Maker tools and must not replace Blender's global keymap.
+
+Q is also an explicit Select entry from supported native Curve Edit tools. W/E/R retain their native behavior until a Spline Maker tool is active. Meshes and other unsupported contexts retain native 1/6/Q controls.
 
 ## Project files
 

@@ -67,7 +67,7 @@ def run(module):
             for target in ("MOVE", "ROTATE", "SCALE"):
                 bpy.ops.spline_maker.switch_tangent_tool(target=target)
                 assert bpy.ops.spline_maker.move_drag.poll() == (target == "MOVE")
-                assert not bpy.ops.spline_maker.tangent_drag.poll()
+                assert bpy.ops.spline_maker.tangent_drag.poll() == (target in {"ROTATE", "SCALE"})
             bpy.ops.spline_maker.whole_selection(action="CLEAR")
             assert not region.whole_selected(data) and obj.select_get()
             bpy.ops.spline_maker.whole_selection(action="SELECT")

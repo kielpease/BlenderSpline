@@ -156,6 +156,35 @@ ZIP validation and the complete background suite pass on Blender 5.2.4 LTS for W
 
 The owner subsequently confirms the 0.14.1 correction works great. Segment crossing-box selection is accepted on that overall report; individual cases were not separately reported.
 
+## SM-015 selection-center Rotate/Scale (0.15.0)
+
+New checks use a parented curve under rotation and nonuniform scale, with multiple open splines. For Segment/Spline/Whole they verify unique selected endpoints and the average-anchor pivot, world XYZ rotations and scales, uniform scaling, transformed anchors and Free handles, unchanged unselected geometry/object matrices, stable flags/types, and no compounded preview. Whole includes edit-hidden points. Synthetic modal tests exercise all axis/view rings and axis/center scale controls, no press jump, preview-owned gizmo hiding, Esc/right-click/Ctrl+Z/window-deactivation rollback, returning to identity, no-op release, tool-change/unregister rollback, empty selections and unavailable orthographic axes.
+
+Native Curve Edit Undo/Redo restores geometry and flags for committed synthetic drags and discrete step actions at each composite level. A separate native-data check preserves Vector/Auto/Aligned/Free types through whole-geometry uniform scaling and Undo. ZIP validation, the focused SM-015 checks and the complete background suite pass on Blender 5.2.4 LTS for Windows, including existing vertex tangent and all Move/selection/lifecycle regressions. Physical controls and operator undo grouping need the 0.15.0 procedure in BUILD.md.
+
+The owner subsequently confirms Move/Rotate/Scale work great for 1/2/3/4. SM-015 is accepted on this overall report; individual control cases were not separately reported. Select re-entry is the separate 0.15.1 correction.
+
+## 0.15.1 Q Select entry regression
+
+ZIP validation, focused entry checks and the complete background suite pass on Blender 5.2.4 LTS for Windows. Tests resolve operators from actual merged keymap items with their polls/properties in default and Industry Compatible configurations. Repeated Object Mode 1/6 entry after native/custom exits must activate Select and Vertex immediately. Native mode entry followed by 1/6 must also activate Select. Q from native Select Box/Move or custom W/E/R activates Select, preserves geometry and composite level/selection, and sets the panel draw path's Q button to pressed. No-selection and mesh Object/Edit contexts reject owned entry actions. Lifecycle tests check every new binding is removed on disable/re-enable. Physical key dispatch and the actual pressed button still need the 0.15.1 viewport procedure.
+
+The owner subsequently confirms the previously mentioned entry fixes work well, accepting 0.15.1 overall.
+
+## 0.15.2 XY scale square
+
+ZIP validation, focused control/transform checks and the complete background suite pass on Blender 5.2.4 LTS for Windows. Synthetic gizmos exercise the actual setup method and confirm SCALE/XY operator routing, positive diagonal offset, and visibility only in Segment/Spline/Whole Scale. Native-data/synthetic-event tests extend all composite transform levels with XY scaling on parented/nonuniformly scaled objects, including nonzero Z geometry. They verify the no-jump offset press, equal world X/Y factors, unchanged world Z, repeated preview, cancel and native Curve Edit Undo/Redo. An edge-on XY view rejects the drag. Physical square size, offset, hit testing and feel require the 0.15.2 viewport procedure.
+
+The owner subsequently confirms 0.15.2 works great, accepting the XY scale control overall and requesting a committed home-session handoff. Individual edge cases were not separately reported.
+
+## SM-016 resume procedure
+
+Resume from the accepted 0.15.2 baseline. Existing synthetic tests establish rollback and native undo data, but not physical event routing or one UI history entry per gesture.
+
+1. Check orbit/pan/zoom while Q/W/E/R are idle, then during box selection, direct-handle drags and active Move/Rotate/Scale. Code inspection shows transform modals consume unhandled events; investigate dispatch and stable projection before changing that policy. Navigation must not create geometry jumps or commits.
+2. For each level, confirm a completed gesture forms one native Undo step and Redo restores it. First Esc cancels the current gesture and restores geometry/selection; the next Esc exits editing. Check right-click cancellation versus the idle vertex-type menu.
+3. Recheck XYZ, plane/view and XY scale controls on transformed/parented objects while changing the view. Tool switches and native tool exit must restore/cancel owned previews without stale gizmos or lost selection.
+4. Verify default/Industry Compatible shortcut scope, repeated Object/Edit entry, context menus and disable/re-enable cleanup. Record actual viewport results separately from background checks. Lifecycle/save-reopen beyond this integration belongs to SM-017.
+
 ## Transform gate
 
 1. Q shows selection without gizmo. W/E/R activate gizmos without moving geometry until manipulated.

@@ -119,3 +119,23 @@ This supersedes the previous Whole Move deferral. In Edit Mode, Whole Move trans
 ## Owner Segment box correction: 0.14.1
 
 At level 2, a box selects a segment if any part of its projected curve touches or crosses the box. Neither anchor needs to be inside. Rectangle direction does not change this rule. A touch at a shared anchor selects each incident segment that touches the box. Shift-box adds touched segments to the existing selection; a plain box replaces it, and a plain box over empty space clears it. Hidden/unprojectable segments remain excluded. This replaces the earlier full-enclosure rule for Segment only; Spline and Whole boxes retain their enclosure behavior.
+
+## SM-015 centered Rotate/Scale: 0.15.0
+
+E Rotate and R Scale now operate on selected Segment, Spline and Whole source geometry about the average of unique selected anchors. Selected segments share endpoint data without transforming a shared point twice. Multiple selected splines transform together about that common center, weighted by their anchors. Whole includes hidden points, consistent with Whole Move. The object's transform and origin stay fixed during these Edit Mode geometry edits.
+
+XYZ rings rotate about global axes; the outer ring rotates in the view plane. XYZ boxes scale along global axes; the center box scales uniformly. Scale remains positive (minimum factor 0.01). The sidebar exposes Rotate Selection 15 degrees (global Z) and Scale Selection x1.25. Gizmos hide during the live preview and return at the restored or committed center. Pressing/releasing without a change cancels; Escape, right-click, Ctrl+Z during a drag and window deactivation restore the snapshot. A completed modal operator supplies one undo boundary.
+
+Geometry transforms retain Corner/Smooth/Bezier/Bezier Corner handle types. Native Auto/Vector rules may recompute tangents as neighboring geometry changes; adjoining unselected segments can change shape because they share anchors. Free/Aligned handles transform with their anchors. Vertex mode retains its established per-anchor tangent pivots and local-Z sidebar rotation step. Individual handle diamonds remain directly draggable in every tool. These rules supersede earlier non-vertex Rotate/Scale deferrals.
+
+## Owner Select entry correction: 0.15.1
+
+For one selected editable all-Bezier curve, 1 now joins 6 as an explicit Object Mode entry into Spline Maker Q Select / Vertex editing. This replaces the earlier decision to leave Object Mode 1 entirely native for that supported curve context. 1 within Curve Edit Mode retains its level-change behavior and active Spline Maker tool; 6 always chooses Q Select / Vertex. The mode entry immediately activates Q and redraws the panel; re-entering after Object Mode does not require a sidebar click.
+
+Q now activates Spline Maker Select from any supported native Curve Edit tool as well as from W/E/R. Q preserves the existing component level and native selection flags. W/E/R remain scoped to an active Spline Maker tool. Object Mode Q, meshes, multi-object editing and unsupported curves retain native behavior. No persistent mode watcher or automatic switching away from explicitly chosen native tools is introduced. Visible Q Select and Edit Spline buttons still call the shared activation actions.
+
+## Owner XY scale control: 0.15.2
+
+Segment, Spline and Whole scale gizmos include a square offset diagonally into positive world XY, outside the center control. Dragging outward along the projected XY diagonal increases X/Y together; dragging inward decreases them by the same factor, with world Z fixed and the existing selection-center pivot. The positive minimum factor remains 0.01. This is a coupled XY scale, not separate X/Y factors. The center square retains uniform XYZ scaling and individual axis boxes retain single-axis scaling. Vertex tangent gizmos retain their existing controls.
+
+An edge-on XY plane reports unavailable movement. The square follows the existing no-jump snapshot preview, cancel rollback, Undo/Redo and gizmo hiding rules. It appears only for R Scale in composite selection levels. The panel identifies the offset square as XY scale with Z fixed.
