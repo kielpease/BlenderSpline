@@ -216,7 +216,7 @@ class VIEW3D_GGT_spline_maker_move(bpy.types.GizmoGroup):
 
 
 class VIEW3D_PT_spline_maker_probe(bpy.types.Panel):
-    bl_label = "Bézier Interaction Test"
+    bl_label = "Spline Maker Edit"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_category = "Spline Maker"
@@ -236,7 +236,11 @@ class VIEW3D_PT_spline_maker_probe(bpy.types.Panel):
             op = layout.operator("wm.tool_set_by_id", text=f"{key}  {label}", depress=mode == target)
             op.name = tool_id(target)
             op.space_type = "VIEW_3D"
-        if mode in {"ROTATE", "SCALE"}:
+        if mode == "SELECT":
+            layout.prop(context.space_data.overlay, "display_handle", text="Handles")
+            layout.label(text="Shift-click to toggle")
+            layout.label(text="Drag to box-select vertices")
+        elif mode in {"ROTATE", "SCALE"}:
             label = "Rotate Handles 15°" if mode == "ROTATE" else "Scale Handles ×1.25"
             layout.operator(SPLINE_MAKER_OT_tangent_step.bl_idname, text=label)
 

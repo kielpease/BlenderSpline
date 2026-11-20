@@ -54,7 +54,17 @@ Blender 5.2.4 LTS for Windows passed ZIP validation and background checks for to
 
 The probe captures the cursor position and view rotation once. Mouse rays come from the live viewport. Their intersections use the captured plane and get stored in its local XY coordinates. The viewport draws temporary preview geometry with a [SpaceView3D draw handler](https://docs.blender.org/api/5.2/bpy.types.SpaceView3D.html#bpy.types.SpaceView3D.draw_handler_add).
 
-The modal session owns a list of preview points. Ctrl+Z and Backspace remove the latest point from that list. Cancel discards the list and detaches the handler. Finish commits an open native Bézier curve in one Blender undo step. This lets scene undo and redo act on the finished curve as a unit. Navigation events pass through to Blender. SM-006 captures an anchor on mouse press and commits on release. Dragging at least five pixels creates equal, opposite handles in the drawing plane. These are saved as native Aligned handles. Shift constraints and closure remain upcoming drawing tasks.
+The modal session owns a list of preview points. Ctrl+Z and Backspace remove the latest point from that list. Cancel discards the list and detaches the handler. Finish commits a native Bézier curve in one Blender undo step. This lets scene undo and redo act on the finished curve as a unit. Navigation events pass through to Blender. SM-006 captures an anchor on mouse press and commits on release. Dragging at least five pixels creates equal, opposite handles in the drawing plane. These are saved as native Aligned handles.
+
+For SM-007, Shift rounds the angle from the previous anchor to the nearest 45° in plane coordinates and preserves the projected distance. The preview and mouse press use the same calculation. Once a press sets the anchor, the handle pull uses projected mouse movement from the unsnapped press location, so snapping does not change the handle direction or length.
+
+On Finish, the curve object origin is the average of its anchors. Bézier coordinates are stored relative to that origin, preserving the world-space positions of anchors and handles on the drawing plane.
+
+SM-008 tests closure against the projected first anchor within a 10-pixel radius. With at least three anchors, the hover preview joins the last anchor to the first using their existing handles. Clicking commits the same anchor list with the native cyclic flag. Enter, right-click, and the Finish button commit open curves.
+
+## SM-009 vertex selection
+
+The Q Select tool projects Bézier vertices and visible handles to screen coordinates using the edited object's world matrix. Click picks the nearest component within nine pixels. Shift-click toggles that component, and a box drag selects anchors. Selection uses Blender's native edit flags, which the existing Move, Rotate, and Scale controls can consume. The hover overlay uses Blender's cursor draw callback to read the pointer for the active viewport and resolves geometry on redraw. It follows Blender's handle visibility setting and runs on a single Bézier curve object in Edit Mode.
 
 ## Later geometry
 

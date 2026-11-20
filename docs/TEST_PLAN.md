@@ -39,6 +39,16 @@ The 0.5.0 background checks cover Finish and Cancel hit regions, consecutive dup
 
 The 0.6.0 background checks on Blender 5.2.4 LTS for Windows verify the drag threshold, preview curvature, a mixed native Bézier spline, equal and opposite Aligned handles, and Rotate on a selected Aligned anchor. The owner confirmed the [viewport check](BUILD.md#sm-006-viewport-check) for click-drag Bézier creation.
 
+## SM-007 Shift direction constraints
+
+The 0.7.0 background checks on Blender 5.2.4 LTS for Windows cover all eight directions near snap boundaries, preservation of distance, first-point placement, consistent results across viewport orientations and after orbiting, and unchanged handle drag offsets. The owner confirmed Shift snapping in the viewport.
+
+The 0.7.1 background checks confirm the new origin matches the average of the anchors and preserves world-space anchor and handle coordinates. The owner confirmed the centered whole-spline Move gizmo in the viewport.
+
+## SM-008 closing and drawing undo
+
+The 0.8.0 background checks on Blender 5.2.4 LTS for Windows exercise the modal event logic for the close tolerance, three-anchor minimum, Backspace and Ctrl+Z point removal, and cancellation of a close click released outside the target. They verify that the finished cyclic spline has no duplicate endpoint and preserves its Aligned and Vector closing handles. The owner confirmed that the [SM-008 viewport behavior](BUILD.md#sm-008-viewport-check) worked as intended.
+
 ## Drawing gate
 
 1. Start from Top Orthographic with cursor at a known location. Draw four corners and close. Confirm flat XY geometry and no duplicate endpoint.
@@ -49,6 +59,8 @@ The 0.6.0 background checks on Blender 5.2.4 LTS for Windows verify the drag thr
 6. Finish an open path, close a path, cancel a session, remove last point, undo/redo. Check no leftovers or changes to unrelated objects.
 
 ## Editing gate
+
+The 0.9.0 SM-009 background checks on Blender 5.2.4 LTS for Windows validate click and Shift-click selection, empty-space deselection, anchor-only box selection, hidden components, and the tool guard. The tests use an object with translation, rotation, and nonuniform scale at two projection scales. The owner confirmed selection toggling and Undo, then verified the square and diamond in 0.9.1 after clicking the sidebar Q Select button. An isolated Industry Compatible viewport test verified rendered pixels for both hover markers and the selected-handle marker after pressing Q from Spline Maker Move. Pressing Q from Blender's Move tool activates Blender's Select Box. Box-drag behavior was covered by background checks and was not separately reported in the owner's viewport.
 
 1. Pick anchors/handles at several zoom levels; Shift-select and box-select vertices; click empty space.
 2. Use right-click types on individual and multiple vertices. Check independent tangents remain part of the same spline.

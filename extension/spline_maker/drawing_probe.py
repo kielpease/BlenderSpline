@@ -1,10 +1,13 @@
 """Modal corner placement and viewport preview."""
 
+from math import fsum
+
 import blf
 import bpy
 import gpu
 from bpy_extras import view3d_utils
 from gpu_extras.batch import batch_for_shader
+from mathutils import Vector
 
 from .drawing_plane import (
     DrawingPlane, DrawingSession, PointPlacement, SplinePoint, project_view_point, segment_preview,
@@ -16,6 +19,7 @@ _exit_binding = None
 _BUTTONS = (("Finish", 84, 160), ("Cancel", 168, 244))
 _COMMITTED_COLOR = (0.25, 0.8, 1.0, 1.0)
 _PREVIEW_COLOR = (0.45, 1.0, 0.78, 1.0)
+_CLOSE_RADIUS = 10
 
 
 def button_at(pixel):
@@ -30,24 +34,36 @@ def is_finish_press(event):
     )
 
 
-def commit_curve(context, session):
+def near_first_vertex(pointer, first_pixel):
+    return pointer is not None and first_pixel is not None and (
+        (pointer[0] - first_pixel[0]) ** 2 + (pointer[1] - first_pixel[1]) ** 2
+        <= _CLOSE_RADIUS ** 2
+    )
+
+
+def commit_curve(context, session, *, closed=False):
+    points = session.points
+    center = Vector(tuple(fsum(point.anchor[axis] for point in points) / len(points)
+                          for axis in range(3)))
     curve = bpy.data.curves.new("Spline Maker Curve", "CURVE")
     curve.dimensions = "3D"
     spline = curve.splines.new("BEZIER")
-    spline.bezier_points.add(len(session.points) - 1)
-    for point, placed in zip(spline.bezier_points, session.points):
-        point.co = placed.anchor
+    spline.bezier_points.add(len(points) - 1)
+    for point, placed in zip(spline.bezier_points, points):
+        anchor = placed.anchor - center
+        point.co = anchor
         if placed.tangent is None:
             point.handle_left_type = point.handle_right_type = "VECTOR"
         else:
             point.handle_left_type = point.handle_right_type = "FREE"
-            point.handle_left = placed.anchor - placed.tangent
-            point.handle_right = placed.anchor + placed.tangent
+            point.handle_left = anchor - placed.tangent
+            point.handle_right = anchor + placed.tangent
             point.handle_left_type = point.handle_right_type = "ALIGNED"
+    spline.use_cyclic_u = closed
 
     obj = bpy.data.objects.new(curve.name, curve)
     context.collection.objects.link(obj)
-    obj.location = session.plane.origin
+    obj.location = session.plane.to_world(center)
     obj.rotation_mode = "QUATERNION"
     obj.rotation_quaternion = session.plane.rotation
     for selected in context.selected_objects:
@@ -91,6 +107,8 @@ class SPLINE_MAKER_OT_draw_spline(bpy.types.Operator):
         self.target = self.context_key(context)
         self.pointer = None
         self.placement = None
+        self.close_pressed = False
+        self.shift = event.shift
         if self.place_on_invoke:
             pixel = (event.mouse_x - context.region.x, event.mouse_y - context.region.y)
             self.begin_placement(context, pixel)
@@ -127,12 +145,14 @@ class SPLINE_MAKER_OT_draw_spline(bpy.types.Operator):
     def cancel(self, context):
         self.cleanup()
 
-    def finish(self, context):
-        if len(self.session.points) < 2:
-            self.report({"INFO"}, "Place at least two points to finish")
+    def finish(self, context, *, closed=False):
+        minimum_points = 3 if closed else 2
+        if len(self.session.points) < minimum_points:
+            message = "Place at least three points to close" if closed else "Place at least two points to finish"
+            self.report({"INFO"}, message)
             return {"RUNNING_MODAL"}
         try:
-            commit_curve(context, self.session)
+            commit_curve(context, self.session, closed=closed)
         finally:
             self.cleanup()
         return {"FINISHED"}
@@ -142,10 +162,21 @@ class SPLINE_MAKER_OT_draw_spline(bpy.types.Operator):
             self.session.plane, context.region, context.region_data, pixel
         )
 
+    def screen_position(self, context, anchor):
+        return view3d_utils.location_3d_to_region_2d(
+            context.region, context.region_data, self.session.plane.to_world(anchor)
+        )
+
+    def over_first_vertex(self, context, pixel):
+        return bool(self.session.points) and near_first_vertex(
+            pixel, self.screen_position(context, self.session.points[0].anchor)
+        )
+
     def begin_placement(self, context, pixel):
-        anchor = self.project(context, pixel)
+        projected = self.project(context, pixel)
+        anchor = self.session.placement_anchor(projected, snap=self.shift)
         if self.session.can_place(anchor):
-            self.placement = PointPlacement(pixel, anchor)
+            self.placement = PointPlacement(pixel, anchor, drag_origin=projected)
 
     def modal(self, context, event):
         if (
@@ -165,7 +196,14 @@ class SPLINE_MAKER_OT_draw_spline(bpy.types.Operator):
                 inside = False
                 break
         self.pointer = pixel if inside else None
+        self.shift = event.shift
         context.area.tag_redraw()
+
+        if self.close_pressed and event.type == "LEFTMOUSE" and event.value == "RELEASE":
+            self.close_pressed = False
+            if button_at(self.pointer) is None and self.over_first_vertex(context, self.pointer):
+                return self.finish(context, closed=True)
+            return {"RUNNING_MODAL"}
 
         if self.placement is not None:
             if inside and (event.type in {"MOUSEMOVE", "INBETWEEN_MOUSEMOVE"}
@@ -186,8 +224,9 @@ class SPLINE_MAKER_OT_draw_spline(bpy.types.Operator):
             # Keep the scene undo stack untouched while preview points exist.
             if event.type == "Z" and event.ctrl and not (event.alt or event.oskey):
                 if not event.shift:
-                    if self.placement is not None:
+                    if self.placement is not None or self.close_pressed:
                         self.placement = None
+                        self.close_pressed = False
                     else:
                         self.session.undo_point()
                 return {"RUNNING_MODAL"}
@@ -198,6 +237,7 @@ class SPLINE_MAKER_OT_draw_spline(bpy.types.Operator):
             if is_finish_press(event):
                 return self.finish(context) if self.placement is None else {"RUNNING_MODAL"}
             if event.type == "BACK_SPACE":
+                self.close_pressed = False
                 self.session.undo_point()
                 return {"RUNNING_MODAL"}
             if event.type == "LEFTMOUSE" and not (event.alt or event.ctrl or event.oskey):
@@ -207,7 +247,10 @@ class SPLINE_MAKER_OT_draw_spline(bpy.types.Operator):
                 if button == "Cancel":
                     self.cleanup()
                     return {"CANCELLED"}
-                self.begin_placement(context, pixel)
+                if self.over_first_vertex(context, pixel):
+                    self.close_pressed = True
+                else:
+                    self.begin_placement(context, pixel)
                 return {"RUNNING_MODAL"}
         return {"PASS_THROUGH"}
 
@@ -218,22 +261,23 @@ class SPLINE_MAKER_OT_draw_spline(bpy.types.Operator):
             or context.region_data is None
         ):
             return
-        plane = self.session.plane
+        points = self.session.points
         button = button_at(self.pointer)
         preview = self.placement.point if self.placement is not None else None
+        close_target = preview is None and button is None and self.over_first_vertex(context, self.pointer)
         unavailable = False
-        if preview is None and self.pointer is not None and button is None:
-            anchor = self.project(context, self.pointer)
-            unavailable = anchor is None
+        if close_target and len(points) >= 3:
+            preview = points[0]
+        elif preview is None and self.pointer is not None and button is None and not close_target:
+            projected = self.project(context, self.pointer)
+            unavailable = projected is None
+            anchor = self.session.placement_anchor(projected, snap=self.shift)
             if self.session.can_place(anchor):
                 preview = SplinePoint(anchor)
 
         def project(point):
-            return view3d_utils.location_3d_to_region_2d(
-                context.region, context.region_data, plane.to_world(point)
-            )
+            return self.screen_position(context, point)
 
-        points = self.session.points
         screen = [
             project(point.anchor) for point in points
         ]
@@ -252,7 +296,7 @@ class SPLINE_MAKER_OT_draw_spline(bpy.types.Operator):
             if points:
                 segment = segment_preview(points[-1], preview)
                 draw_batch(shader, "LINES", visible_lines(project(p) for p in segment), _PREVIEW_COLOR)
-            if preview.tangent is not None:
+            if self.placement is not None and preview.tangent is not None:
                 guides = (preview.anchor - preview.tangent, preview.anchor, preview.anchor + preview.tangent)
                 draw_batch(shader, "LINES", visible_lines(project(p) for p in guides), _PREVIEW_COLOR)
             pixel = project(preview.anchor)
@@ -269,8 +313,10 @@ class SPLINE_MAKER_OT_draw_spline(bpy.types.Operator):
         if count < 2:
             status = f"{count} / 2 points needed to finish   |   Click for corner or drag handles"
         else:
-            status = f"{count} points   |   Click or drag   |   Right-click to finish"
-        if unavailable:
+            status = f"{count} points   |   Click or drag   |   Shift snaps 45°   |   Right-click to finish"
+        if close_target:
+            status = "Click first point to close" if count >= 3 else "Place at least three points to close"
+        elif unavailable:
             status = "Placement unavailable. Orbit to face the drawing plane."
         draw_text(84, 81, status)
 
@@ -323,6 +369,8 @@ class SplineMakerDrawTool(bpy.types.WorkSpaceTool):
     bl_cursor = "CROSSHAIR"
     bl_keymap = (
         ("spline_maker.draw_spline", {"type": "LEFTMOUSE", "value": "PRESS"},
+         {"properties": [("place_on_invoke", True)]}),
+        ("spline_maker.draw_spline", {"type": "LEFTMOUSE", "value": "PRESS", "shift": True},
          {"properties": [("place_on_invoke", True)]}),
     )
 

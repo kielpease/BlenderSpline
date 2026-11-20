@@ -1,7 +1,7 @@
 """Install a local package and check the enable, disable, re-enable cycle."""
 
 import importlib
-from math import radians
+from math import cos, radians, sin
 import os
 from pathlib import Path
 import sys
@@ -30,6 +30,7 @@ def main(archive):
     assert_enabled(module, menu)
     assert_probe(module.feasibility)
     assert_drawing_probe(module.drawing_probe, module.feasibility)
+    assert_vertex_selection(module.vertex_selection, module.feasibility)
     assert bpy.ops.preferences.addon_disable(module=module_name) == {"FINISHED"}
     assert_disabled(module, menu)
     assert bpy.ops.preferences.addon_enable(module=module_name) == {"FINISHED"}
@@ -54,6 +55,10 @@ def assert_enabled(module, menu):
         (item.type, item.properties.target) for item in keymaps["Curve"].keymap_items
         if item.idname == "spline_maker.switch_tangent_tool"
     } == {("E", "ROTATE"), ("R", "SCALE")}
+    assert {
+        (item.type, item.value, item.shift) for item in keymaps["Curve"].keymap_items
+        if item.idname == "spline_maker.vertex_select"
+    } == {("LEFTMOUSE", "PRESS", 0), ("LEFTMOUSE", "PRESS", 1)}
     keyconfigs = bpy.context.window_manager.keyconfigs
     keyconfigs.update()
     merged_items = keyconfigs.user.keymaps["Curve"].keymap_items
@@ -80,10 +85,79 @@ def assert_disabled(module, menu):
     assert all(not hasattr(tool, "_bl_tool") for tool in module.feasibility.WORKSPACE_TOOLS)
     assert not hasattr(module.drawing_probe.SplineMakerDrawTool, "_bl_tool")
     assert module.drawing_probe._exit_binding is None
+    assert not module.vertex_selection._bindings
+    assert module.vertex_selection._cursor_handler is None
     keymaps = bpy.context.window_manager.keyconfigs.addon.keymaps
     assert not any("Spline Maker" in keymap.name for keymap in keymaps)
     assert not any(item.idname == "spline_maker.switch_tangent_tool"
                    for item in keymaps["Curve"].keymap_items)
+
+
+def assert_vertex_selection(picking, editing):
+    area = next(area for area in bpy.context.window.screen.areas if area.type == "VIEW_3D")
+    region = next(region for region in area.regions if region.type == "WINDOW")
+    with bpy.context.temp_override(area=area, region=region):
+        assert bpy.ops.spline_maker.add_test_curve() == {"FINISHED"}
+        obj = bpy.context.object
+        obj.location = (4, -3, 1)
+        obj.rotation_euler.z = radians(32)
+        obj.scale = (1.5, 0.75, 2.0)
+        bpy.context.view_layer.update()
+        assert bpy.ops.object.mode_set(mode="EDIT") == {"FINISHED"}
+        try:
+            assert bpy.ops.wm.tool_set_by_id(name="builtin.select_box") == {"FINISHED"}
+            assert not bpy.ops.spline_maker.vertex_select.poll()
+            assert bpy.ops.wm.tool_set_by_id(name=editing.tool_id("SELECT")) == {"FINISHED"}
+            assert bpy.ops.spline_maker.vertex_select.poll()
+            points = tuple(editing.editable_bezier_points(bpy.context))
+            first, second = points
+            picking.clear_selection(points)
+            for zoom in (20, 75):
+                def project(world):
+                    return 480 + world.x * zoom, 360 + world.y * zoom
+
+                components = list(picking.project_components(points, obj.matrix_world, project, "ALL"))
+                assert len(components) == 6
+                anchor_pixel = project(obj.matrix_world @ first.co)
+                handle_pixel = project(obj.matrix_world @ first.handle_left)
+                anchor = picking.pick_component(components, anchor_pixel)
+                handle = picking.pick_component(components, handle_pixel)
+                assert anchor.coordinate == "co" and handle.coordinate == "handle_left"
+                assert picking.pick_component(components, (0, 0)) is None
+
+                picking.click_select(points, anchor, extend=False)
+                assert first.select_control_point and not first.select_left_handle
+                picking.click_select(points, handle, extend=False)
+                assert not first.select_control_point and first.select_left_handle
+                picking.click_select(points, anchor, extend=True)
+                picking.click_select(points, handle, extend=True)
+                assert first.select_control_point and not first.select_left_handle
+                picking.click_select(points, None, extend=False)
+                assert not any(component.selected for component in components)
+
+                # The box includes the handle, but only its anchor is selected.
+                xmin, xmax = sorted((anchor_pixel[0], handle_pixel[0]))
+                ymin, ymax = sorted((anchor_pixel[1], handle_pixel[1]))
+                picking.box_select(points, components, (xmax + 1, ymax + 1),
+                                   (xmin - 1, ymin - 1), extend=False)
+                assert first.select_control_point and not first.select_left_handle
+                assert not second.select_control_point
+                second_pixel = project(obj.matrix_world @ second.co)
+                x, y = second_pixel
+                picking.box_select(points, components, (x - 1, y - 1), (x + 1, y + 1), extend=True)
+                assert first.select_control_point and second.select_control_point
+
+                first.hide = True
+                visible = tuple(editing.editable_bezier_points(bpy.context))
+                assert len(visible) == 1 and visible[0].co == second.co
+                assert len(list(picking.project_components(visible, obj.matrix_world, project, "NONE"))) == 1
+                first.hide = False
+
+            assert bpy.ops.wm.tool_set_by_id(name=editing.tool_id("MOVE")) == {"FINISHED"}
+            assert not bpy.ops.spline_maker.vertex_select.poll()
+            assert editing.VIEW3D_GGT_spline_maker_move.poll(bpy.context)
+        finally:
+            bpy.ops.object.mode_set(mode="OBJECT")
 
 
 def assert_drawing_probe(probe, editing):
@@ -98,6 +172,8 @@ def assert_drawing_probe(probe, editing):
     assert probe.button_at((165, 55)) is None
     assert_view_projection(probe)
     assert_mixed_spline(probe)
+    assert_shift_constraint(probe)
+    assert_closing_spline(probe)
 
     toolbar = ToolSelectPanelHelper._tool_class_from_space_type("VIEW_3D")
     add_group = next(
@@ -108,8 +184,9 @@ def assert_drawing_probe(probe, editing):
                for tool in add_group) == 1
     assert probe.SplineMakerDrawTool._bl_tool.cursor == "CROSSHAIR"
     keymaps = bpy.context.window_manager.keyconfigs.addon.keymaps
-    binding = keymaps[probe.SplineMakerDrawTool._bl_tool.keymap[0]].keymap_items[0]
-    assert binding.type == "LEFTMOUSE" and binding.properties.place_on_invoke
+    bindings = keymaps[probe.SplineMakerDrawTool._bl_tool.keymap[0]].keymap_items
+    assert [(binding.type, binding.shift, binding.properties.place_on_invoke)
+            for binding in bindings] == [("LEFTMOUSE", False, True), ("LEFTMOUSE", True, True)]
     keyconfigs = bpy.context.window_manager.keyconfigs
     keyconfigs.update()
     exit_binding = next(
@@ -175,6 +252,7 @@ def assert_drawing_probe(probe, editing):
     assert spline.type == "BEZIER"
     assert not spline.use_cyclic_u
     assert len(spline.bezier_points) == 2
+    assert (obj.matrix_world.translation - plane.to_world((point + second) / 2)).length < 1e-5
     for control, local in zip(spline.bezier_points, (point, second)):
         assert (obj.matrix_world @ control.co - plane.to_world(local)).length < 1e-5
     assert bpy.context.view_layer.objects.active == obj
@@ -219,16 +297,19 @@ def assert_mixed_spline(probe):
 
     session.place(start)
     session.place(placement.point.anchor, placement.point.tangent)
-    session.place(Vector((6, 0, 0)))
+    end = Vector((8, 3, 0))
+    session.place(end)
     preview = probe.segment_preview(*session.points[:2])
     assert preview[0] == start and preview[-1] == anchor
     assert any(abs(point.y) > 0.1 for point in preview[1:-1])
     obj = probe.commit_curve(bpy.context, session)
+    bpy.context.view_layer.update()
     first, middle, last = obj.data.splines[0].bezier_points
+    assert (obj.matrix_world.translation - (start + anchor + end) / 3).length < 1e-5
     assert first.handle_right_type == last.handle_left_type == "VECTOR"
     assert middle.handle_left_type == middle.handle_right_type == "ALIGNED"
-    assert (middle.handle_left - (anchor - offset)).length < 1e-5
-    assert (middle.handle_right - (anchor + offset)).length < 1e-5
+    assert (obj.matrix_world @ middle.handle_left - (anchor - offset)).length < 1e-5
+    assert (obj.matrix_world @ middle.handle_right - (anchor + offset)).length < 1e-5
     area = next(area for area in bpy.context.window.screen.areas if area.type == "VIEW_3D")
     region = next(region for region in area.regions if region.type == "WINDOW")
     with bpy.context.temp_override(area=area, region=region):
@@ -240,10 +321,113 @@ def assert_mixed_spline(probe):
             assert bpy.ops.wm.tool_set_by_id(name="spline_maker.probe_rotate") == {"FINISHED"}
             assert bpy.ops.spline_maker.tangent_step() == {"FINISHED"}
             rotated = Matrix.Rotation(radians(15), 3, "Z") @ offset
-            assert (middle.handle_left - (anchor - rotated)).length < 1e-5
-            assert (middle.handle_right - (anchor + rotated)).length < 1e-5
+            assert (middle.handle_left - (middle.co - rotated)).length < 1e-5
+            assert (middle.handle_right - (middle.co + rotated)).length < 1e-5
         finally:
             bpy.ops.object.mode_set(mode="OBJECT")
+
+
+def assert_shift_constraint(probe):
+    plane = probe.DrawingPlane(Vector((0, 0, 0)), Quaternion())
+    session = probe.DrawingSession(plane)
+    previous = Vector((3, -2, 0))
+    projected = Vector((6, -1, 0))
+    assert session.placement_anchor(projected, snap=True) == projected
+    session.place(previous)
+    assert session.placement_anchor(previous, snap=True) == previous
+    assert session.placement_anchor(None, snap=True) is None
+    for degrees in range(-180, 180, 45):
+        for delta in (-22.4, 22.4):
+            angle = radians(degrees + delta)
+            projected = previous + 5 * Vector((cos(angle), sin(angle), 0))
+            snapped = session.placement_anchor(projected, snap=True)
+            target = radians(degrees)
+            expected = previous + 5 * Vector((cos(target), sin(target), 0))
+            assert (snapped - expected).length < 1e-5
+            assert abs((snapped - previous).length - (projected - previous).length) < 1e-5
+            assert session.placement_anchor(projected, snap=False) == projected
+
+    # A snapped anchor may be offset from the pointer. The handle follows
+    # the projected drag motion when Shift is released during the drag.
+    projected = Vector((6, -1, 0))
+    operator = SimpleNamespace(session=session, shift=True, project=lambda *_: projected)
+    probe.SPLINE_MAKER_OT_draw_spline.begin_placement(operator, None, (100, 100))
+    snapped = session.placement_anchor(projected, snap=True)
+    assert operator.placement.point.anchor == snapped
+    operator.shift = False
+    drag = Vector((0.25, 0.75, 0))
+    operator.placement.update((110, 112), projected + drag)
+    assert operator.placement.point.anchor == snapped
+    assert (operator.placement.point.tangent - drag).length < 1e-5
+
+
+def assert_closing_spline(probe):
+    operator_class = probe.SPLINE_MAKER_OT_draw_spline
+    plane = probe.DrawingPlane(Vector((2, 3, 4)), Quaternion((1, 0, 0), radians(33)))
+    session = probe.DrawingSession(plane)
+    first = Vector((0, 0, 0))
+    tangent = Vector((1, 0.5, 0))
+    last = Vector((2, 5, 0))
+    session.place(first, tangent)
+    session.place(Vector((5, 0, 0)))
+    before = set(bpy.data.objects)
+    hit = (200, 200)
+    assert probe.near_first_vertex((206, 208), hit)
+    assert not probe.near_first_vertex((208, 208), hit)
+    assert not probe.near_first_vertex(hit, None)
+
+    context = SimpleNamespace(
+        mode="OBJECT", region_data=object(),
+        area=SimpleNamespace(regions=[], tag_redraw=lambda: None),
+        region=SimpleNamespace(x=0, y=0, width=500, height=500),
+    )
+    operator = SimpleNamespace(
+        session=session, placement=None, close_pressed=False, target=(),
+        context_key=lambda _: (), screen_position=lambda *_: hit,
+        cleanup=session.cancel, report=lambda *_: None,
+    )
+    operator.over_first_vertex = lambda ctx, pixel: operator_class.over_first_vertex(operator, ctx, pixel)
+    operator.finish = lambda _, **args: operator_class.finish(operator, bpy.context, **args)
+
+    def send(event_type, value="PRESS", *, pixel=hit, ctrl=False, alt=False):
+        event = SimpleNamespace(
+            type=event_type, value=value, mouse_x=pixel[0], mouse_y=pixel[1],
+            ctrl=ctrl, alt=alt, shift=False, oskey=False,
+        )
+        return operator_class.modal(operator, context, event)
+
+    probe._active = operator
+    try:
+        assert send("LEFTMOUSE") == {"RUNNING_MODAL"}
+        assert send("LEFTMOUSE", "RELEASE") == {"RUNNING_MODAL"}
+        assert len(session.points) == 2 and set(bpy.data.objects) == before
+        session.place(last)
+        assert send("BACK_SPACE") == {"RUNNING_MODAL"}
+        assert len(session.points) == 2
+        session.place(last)
+        assert send("Z", ctrl=True) == {"RUNNING_MODAL"}
+        assert len(session.points) == 2
+        session.place(last)
+        assert send("RIGHTMOUSE", alt=True) == {"PASS_THROUGH"}
+        assert send("LEFTMOUSE") == {"RUNNING_MODAL"}
+        assert send("LEFTMOUSE", "RELEASE", pixel=(240, 200)) == {"RUNNING_MODAL"}
+        assert set(bpy.data.objects) == before
+        assert send("LEFTMOUSE", pixel=(206, 208)) == {"RUNNING_MODAL"}
+        assert send("LEFTMOUSE", "RELEASE") == {"FINISHED"}
+    finally:
+        probe._active = None
+
+    obj = bpy.context.view_layer.objects.active
+    assert not session.points and set(bpy.data.objects) - before == {obj}
+    bpy.context.view_layer.update()
+    spline = obj.data.splines[0]
+    assert spline.use_cyclic_u and len(spline.bezier_points) == 3
+    start, _, end = spline.bezier_points
+    assert start.handle_left_type == "ALIGNED"
+    assert (obj.matrix_world @ start.handle_left - plane.to_world(first - tangent)).length < 1e-5
+    assert end.handle_right_type == "VECTOR"
+    expected = plane.to_world(last + (first - last) / 3)
+    assert (obj.matrix_world @ end.handle_right - expected).length < 1e-5
 
 
 def assert_view_projection(probe):
@@ -255,6 +439,9 @@ def assert_view_projection(probe):
     local = Vector((1.25, -0.75, 0))
     for start in (Quaternion(), front, side, angled):
         plane = probe.DrawingPlane(cursor, start)
+        session = probe.DrawingSession(plane)
+        session.place(Vector((0, 0, 0)))
+        snapped = session.placement_anchor(local, snap=True)
         world_point = plane.to_world(local)
         # Reproject the same point after orbiting away from the starting view.
         for view_rotation in (start, start @ angled):
@@ -273,6 +460,7 @@ def assert_view_projection(probe):
                 pixel = view3d_utils.location_3d_to_region_2d(region, view, world_point)
                 actual = probe.project_view_point(plane, region, view, pixel)
                 assert actual is not None and (actual - local).length < 1e-4
+                assert (session.placement_anchor(actual, snap=True) - snapped).length < 1e-4
 
 
 def is_registered(cls):

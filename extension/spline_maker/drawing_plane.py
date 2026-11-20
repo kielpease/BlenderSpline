@@ -1,6 +1,7 @@
 """View projection and in-progress points for the fixed drawing plane."""
 
 from dataclasses import dataclass
+from math import atan2, cos, floor, hypot, pi, sin
 
 from bpy_extras import view3d_utils
 from mathutils import Vector
@@ -43,9 +44,10 @@ class SplinePoint:
 
 
 class PointPlacement:
-    def __init__(self, pixel, anchor):
+    def __init__(self, pixel, anchor, *, drag_origin=None):
         self.start_pixel = Vector(pixel)
         self.point = SplinePoint(anchor.copy())
+        self.drag_origin = anchor.copy() if drag_origin is None else drag_origin.copy()
         self.dragging = False
 
     def update(self, pixel, coordinate):
@@ -53,7 +55,7 @@ class PointPlacement:
             return
         self.dragging = self.dragging or (Vector(pixel) - self.start_pixel).length_squared >= 25
         if self.dragging:
-            offset = coordinate - self.point.anchor
+            offset = coordinate - self.drag_origin
             self.point.tangent = offset if offset.length_squared > 1e-12 else None
 
 
@@ -78,6 +80,16 @@ class DrawingSession:
     def place(self, anchor, tangent=None):
         if self.can_place(anchor):
             self.points.append(SplinePoint(anchor.copy(), tangent.copy() if tangent is not None else None))
+
+    def placement_anchor(self, projected, *, snap):
+        if projected is None or not self.points or not snap:
+            return projected
+        previous = self.points[-1].anchor
+        offset = projected - previous
+        radius = hypot(offset.x, offset.y)
+        step = pi / 4
+        direction = floor(atan2(offset.y, offset.x) / step + 0.5) * step
+        return previous + Vector((radius * cos(direction), radius * sin(direction), 0))
 
     def can_place(self, point):
         return point is not None and (
