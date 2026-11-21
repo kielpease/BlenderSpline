@@ -2,7 +2,7 @@
 
 Splines targets Blender 5.2.4 LTS on Windows. The ZIP is for local testing. The manifest carries a license placeholder until the owner selects a license and updates the metadata for distribution.
 
-Build **0.18.0** for the current local installer. The local stable ZIP contains the validated 0.18.0 package. Earlier procedures record the key mappings and features tested at those versions.
+Build **0.18.1** for the current local installer. The local stable ZIP contains the validated 0.18.1 package. Earlier procedures record the key mappings and features tested at those versions.
 
 ## Build and validate
 
@@ -13,10 +13,10 @@ $blender = 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe'
 New-Item -ItemType Directory -Force dist | Out-Null
 & $blender --command extension validate extension/spline_maker
 & $blender --command extension build --source-dir extension/spline_maker --output-dir dist
-& $blender --command extension validate dist/spline_maker-0.18.0.zip
+& $blender --command extension validate dist/spline_maker-0.18.1.zip
 ```
 
-Blender writes the ZIP to `dist/spline_maker-0.18.0.zip` using its extension packaging commands. [Blender extension CLI documentation](https://docs.blender.org/manual/en/5.2/advanced/command_line/extension_arguments.html)
+Blender writes the ZIP to `dist/spline_maker-0.18.1.zip` using its extension packaging commands. [Blender extension CLI documentation](https://docs.blender.org/manual/en/5.2/advanced/command_line/extension_arguments.html)
 
 ## Stable local installer
 
@@ -25,7 +25,7 @@ Keep all versioned test builds in `dist/`. Use `stable/spline_maker-stable.zip` 
 After the owner accepts a candidate, set `$candidate` to its exact ZIP in `dist/` and validate it before replacing the stable copy. The original versioned ZIP stays in `dist/`.
 
 ```powershell
-$candidate = 'dist/spline_maker-0.18.0.zip'
+$candidate = 'dist/spline_maker-0.18.1.zip'
 & $blender --command extension validate $candidate
 if ($LASTEXITCODE -ne 0) { throw 'Candidate validation failed' }
 New-Item -ItemType Directory -Force stable | Out-Null
@@ -41,7 +41,7 @@ $previousResources = $env:BLENDER_USER_RESOURCES
 try {
     $testProfile = Join-Path (Resolve-Path dist) ([guid]::NewGuid().ToString())
     $env:BLENDER_USER_RESOURCES = (New-Item -ItemType Directory $testProfile).FullName
-    & $blender --background --factory-startup --python-exit-code 1 --python tests/blender/smoke_registration.py -- dist/spline_maker-0.18.0.zip
+    & $blender --background --factory-startup --python-exit-code 1 --python tests/blender/smoke_registration.py -- dist/spline_maker-0.18.1.zip
 } finally {
     $env:BLENDER_USER_RESOURCES = $previousResources
 }

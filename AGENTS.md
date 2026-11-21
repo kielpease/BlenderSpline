@@ -34,7 +34,7 @@ For each change: summarize behavior, files changed, tests, limitations, and a sh
 
 ## Session handoff: 2026-11-21
 
-- The stable installer contains **0.18.0**, packaged from the owner-accepted **0.17.0** editing and lifecycle build.
+- The stable installer contains **0.18.1** with **Pease Technology, LLC** as maintainer. It includes the owner-accepted **0.17.0** editing and lifecycle features.
 - Repository: `https://github.com/kielpease/BlenderSpline`, branch `main`. Inspect local changes before pulling on another machine.
 - **SM-016 interaction integration** was pushed to `main` in commit `0413429` with the **0.16.0** ZIP available locally under `dist/`.
 - `drag_navigation.py` forwards viewport navigation events and detects projection changes during edit gestures. Move, Rotate, Scale, and direct handles rebase their input from the applied preview. Edit entry via **1** or **6** records a native Edit Mode checkpoint for the first transform Undo.
@@ -60,7 +60,7 @@ From the repository root, set `$blender` to the local Blender 5.2.4 executable a
 ```powershell
 New-Item -ItemType Directory -Force dist | Out-Null
 & $blender --command extension build --source-dir extension/spline_maker --output-dir dist
-& $blender --command extension validate dist/spline_maker-0.18.0.zip
+& $blender --command extension validate dist/spline_maker-0.18.1.zip
 ```
 
 Use the isolated-profile smoke-test command in `docs/BUILD.md`; it sets/restores `BLENDER_USER_RESOURCES` and installs into a fresh directory under `dist`, protecting the normal Blender profile. The entry point is `tests/blender/smoke_registration.py`, which runs the segment, region/spline, controls, Whole Move, transform and entry regression modules. Disable the previous build and restart Blender before installing a new ZIP for hands-on testing.

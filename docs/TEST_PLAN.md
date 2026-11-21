@@ -196,7 +196,9 @@ The automated viewport check is `tests/blender/lifecycle_viewport.py`. Run it wi
 
 Version 0.18.0 packages the accepted 0.17.0 lifecycle changes. Blender 5.2.4 LTS for Windows validated the manifest and ZIP and installed the archive into two fresh profiles. The full background suite passed native drawing and editing checks, Default and Industry Compatible keymap checks, save/reopen, and registration cleanup. The isolated Industry Compatible viewport run passed drawing, Move, scene and tool changes, Undo/Redo, save/reopen, and disable/re-enable.
 
-The versioned package is `dist/spline_maker-0.18.0.zip`. The local stable ZIP is a verified copy of the versioned package. The guide covers installation, the current workflow, and known limits. Public distribution awaits a license decision. [User guide](USER_GUIDE.md) · [Build commands](BUILD.md#build-and-validate)
+The versioned package is `dist/spline_maker-0.18.0.zip`. The guide covers installation, the current workflow, and known limits. Public distribution awaits a license decision. [User guide](USER_GUIDE.md) · [Build commands](BUILD.md#build-and-validate)
+
+Version 0.18.1 sets the maintainer to Pease Technology, LLC. The local stable ZIP is a verified copy of `dist/spline_maker-0.18.1.zip`.
 
 ### 0.15.3 edit controls
 

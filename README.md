@@ -2,11 +2,11 @@
 
 Splines is a Blender extension for drawing and editing native Bézier curves in the 3D Viewport. Draw mixed straight and curved outlines directly, then work at the vertex, segment, spline, or whole-curve level.
 
-**Local build 0.18.0** · Verified on Blender 5.2.4 LTS for Windows, with Default and Industry Compatible keymap coverage.
+**Local build 0.18.1** · Maintained by **Pease Technology, LLC**. Verified on Blender 5.2.4 LTS for Windows, with Default and Industry Compatible keymap coverage.
 
 ## Quick start
 
-1. Build `spline_maker-0.18.0.zip` from this checkout. In Blender, go to **Edit → Preferences → Get Extensions** and choose **Install from Disk** from the top-right menu. [Build instructions](docs/BUILD.md#build-and-validate)
+1. Build `spline_maker-0.18.1.zip` from this checkout. In Blender, go to **Edit → Preferences → Get Extensions** and choose **Install from Disk** from the top-right menu. [Build instructions](docs/BUILD.md#build-and-validate)
 2. In Object Mode, choose **Add → Curve → Draw Spline** or open the **Splines** tab in the viewport sidebar with **N**. Click to place corners or drag to pull linked handles. Right-click to finish an open spline. Click the first point to close it after placing at least three vertices.
 3. Select one Bézier curve and press **6** to edit. Use **1–4** for the selection level and **Q/W/E/R** for Select, Move, Rotate, or Scale. Press **Enter** to finish editing.
 

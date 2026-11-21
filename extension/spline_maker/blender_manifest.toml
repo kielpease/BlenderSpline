@@ -1,9 +1,9 @@
 schema_version = "1.0.0"
 id = "spline_maker"
-version = "0.18.0"
+version = "0.18.1"
 name = "Splines"
 tagline = "Draw and edit splines in the 3D Viewport"
-maintainer = "Spline Maker Project"
+maintainer = "Pease Technology, LLC"
 type = "add-on"
 blender_version_min = "5.2.4"
 # Required by Blender for local packaging. Replace once the owner selects a license.

@@ -1,10 +1,10 @@
 # Splines user guide
 
-Splines 0.18.0 is verified on Blender 5.2.4 LTS for Windows. The ZIP installs as **Splines** and uses the extension ID `spline_maker`.
+Splines 0.18.1 is verified on Blender 5.2.4 LTS for Windows. The ZIP installs as **Splines** and uses the extension ID `spline_maker`.
 
 ## Install or update
 
-Build `dist/spline_maker-0.18.0.zip` from the repository or use the local stable installer if it is available. Both paths contain an installable ZIP. [Build instructions](BUILD.md#build-and-validate)
+Build `dist/spline_maker-0.18.1.zip` from the repository or use the local stable installer if it is available. Both paths contain an installable ZIP. [Build instructions](BUILD.md#build-and-validate)
 
 In Blender, open **Edit → Preferences → Get Extensions**. From the top-right menu, choose **Install from Disk** and select the ZIP. Enable **Splines** under **Add-ons** if needed. When replacing a previous build, disable it and restart Blender before installing. If Blender reports an already-registered class, restart and check the version under **Add-ons** before enabling it again.
 
