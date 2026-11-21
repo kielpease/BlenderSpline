@@ -6,10 +6,10 @@ from .drawing_probe import SPLINE_MAKER_OT_draw_spline
 
 
 class VIEW3D_PT_spline_maker(bpy.types.Panel):
-    bl_label = "Spline Maker"
+    bl_label = "Splines"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "Spline Maker"
+    bl_category = "Splines"
     bl_context = "objectmode"
 
     def draw(self, context):

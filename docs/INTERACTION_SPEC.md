@@ -139,3 +139,41 @@ Q now activates Spline Maker Select from any supported native Curve Edit tool as
 Segment, Spline and Whole scale gizmos include a square offset diagonally into positive world XY, outside the center control. Dragging outward along the projected XY diagonal increases X/Y together; dragging inward decreases them by the same factor, with world Z fixed and the existing selection-center pivot. The positive minimum factor remains 0.01. This is a coupled XY scale, not separate X/Y factors. The center square retains uniform XYZ scaling and individual axis boxes retain single-axis scaling. Vertex tangent gizmos retain their existing controls.
 
 An edge-on XY plane reports unavailable movement. The square follows the existing no-jump snapshot preview, cancel rollback, Undo/Redo and gizmo hiding rules. It appears only for R Scale in composite selection levels. The panel identifies the offset square as XY scale with Z fixed.
+
+## Edit controls candidate: 0.15.3
+
+The Edit panel puts **1 Vertex**, **2 Segment**, **3 Spline**, and **4 All** first. In supported Curve Edit Mode, 4 selects all source splines, including hidden points. Enter and Numpad Enter invoke Finish Editing when a Spline Maker tool is active. Esc still cancels an active drag or finishes editing when idle.
+
+Vertex Move places the gizmo at the average of the selected anchors. In Vertex mode, E Rotate offers **Tangents**, the established per-anchor handle rotation, and **Group**, which rotates selected anchors and handles together about their average. The axis rings use world axes and the outer ring uses the view axis. Vertex Scale keeps the per-anchor handle behavior.
+
+## Edit snapping candidate: 0.15.4
+
+During a single-vertex Move, Shift aligns the vertex's world X or Y coordinate to a visible unselected vertex of the same curve. The adjustment stays on the active Move axis or plane and must be within 10 screen pixels of the free placement. When either coordinate is available, the smallest eligible adjustment wins.
+
+During direct handle dragging, Shift snaps a handle within 10 screen pixels of the straight line from its anchor through the adjoining vertex on that side. The line extends beyond the neighboring vertex. An open endpoint's outward handle has no adjoining vertex. Releasing Shift returns to free placement. Esc during a drag restores that gesture's starting state. Esc while idle leaves Edit Mode with earlier completed edits intact.
+
+## Compact controls and transform readouts: 0.15.5
+
+The visible extension and sidebar name is **Splines**. The Edit panel uses four icons for Select, Move, Rotate, and Scale, with Q/W/E/R in their tooltips. The **Info** section at the bottom is collapsed by default. The old 15° rotation button is removed from the panel.
+
+While dragging a rotation control, Shift snaps the signed angle to the nearest 10° step or multiple of 45°, whichever is closer. While dragging a scale control, Shift snaps the current factor to whole percentages. A callout displays the applied value by the pivot during the drag. Releasing Shift resumes free rotation or scaling from the same gesture.
+
+## Rotation visibility and numeric editing: 0.15.6
+
+The rotation rings stay at the gesture's starting pivot during a drag. The angle readout sits to one side of the rings. The Edit panel shows the world XYZ coordinates of one selected vertex or the mean of the selected anchors. Clicking a coordinate opens a numeric entry for that axis. Confirming translates the selected anchors and their handles together in one edit.
+
+Shift-dragging a handle can snap to local X, local Y, or the adjoining segment's straight line, all passing through the anchor. The closest projected line within 10 screen pixels wins. Newly drawn splines use the axes of their original drawing plane for local X and Y.
+
+## Scale visibility and first-vertex grid snapping: 0.15.7
+
+Scale controls stay at the starting pivot during a drag, with the percentage readout to the side. Holding Shift before placing the first vertex snaps to a grid on the fixed drawing plane. The grid is aligned to the plane axes and anchored at the world origin projected onto the plane. In unitless axis-aligned orthographic views, the spacing follows Blender's prominent viewport grid interval. Angled views and scenes with units use Blender's configured unit-scaled grid size. Once a vertex is placed, Shift constrains direction in 45° steps.
+
+## Bézier handles on close: 0.15.8
+
+After three or more vertices, press within 10 screen pixels of the first vertex and drag at least five pixels to pull linked handles at the seam. The first anchor stays fixed, the pull stays in the drawing plane, and the preview updates both adjoining segments. Release to close with the new handles. A plain click to close preserves the first vertex's existing handles.
+
+## Interaction integration: 0.16.0
+
+Viewport navigation stays available during Move, Rotate, Scale, direct handle drags, and box selection. While the view changes, the active transform holds its applied preview. The next pointer update establishes a new reference for continuing the same gesture. Axis and world-plane controls keep their constraints. The view-facing rotation ring uses the view axis from the start of the drag.
+
+Primary-button release commits the transform. Esc or plain right-click during a drag restores its starting state. With editing idle, right-click opens the vertex types menu and Esc finishes editing. Entering through **1** or **6** records a native Edit Mode checkpoint so Undo of the first transform can return to the original curve in Edit Mode.

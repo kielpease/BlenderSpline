@@ -1,7 +1,7 @@
 """View projection and in-progress points for the fixed drawing plane."""
 
 from dataclasses import dataclass
-from math import atan2, cos, floor, hypot, pi, sin
+from math import atan2, cos, floor, hypot, isfinite, pi, sin
 
 from bpy_extras import view3d_utils
 from mathutils import Vector
@@ -14,6 +14,7 @@ class DrawingPlane:
         self.rotation = rotation.normalized()
         self.inverse = self.rotation.inverted()
         self.normal = self.rotation @ Vector((0, 0, 1))
+        self.grid_origin = self.inverse @ -self.origin
 
     def intersect(self, origin, direction, *, perspective):
         alignment = self.normal.dot(direction)
@@ -35,6 +36,28 @@ def project_view_point(plane, region, view, pixel):
     # its origin by the far clip, which can reduce placement precision.
     origin = view3d_utils.region_2d_to_origin_3d(region, view, pixel, clamp=0.0)
     return plane.intersect(origin, direction, perspective=view.is_perspective)
+
+
+def viewport_grid_spacing(context, plane):
+    overlay = context.space_data.overlay
+    base = overlay.grid_scale_unit
+    view = context.region_data
+    if (base <= 0 or context.scene.unit_settings.system != "NONE"
+            or not view.is_orthographic_side_view
+            or abs(plane.normal.dot(view.view_rotation @ Vector((0, 0, 1)))) < 1 - 1e-5):
+        return base
+    # Match the prominent grid interval in Blender's unitless axis view.
+    projection = context.region.width * abs(view.window_matrix[0][0])
+    subdivisions = overlay.grid_subdivisions
+    if projection <= 0 or subdivisions <= 1:
+        return base
+    threshold = 120 / projection
+    spacing = base / subdivisions ** 3
+    for _ in range(7):
+        if spacing * subdivisions >= threshold:
+            break
+        spacing *= subdivisions
+    return spacing
 
 
 @dataclass
@@ -81,9 +104,18 @@ class DrawingSession:
         if self.can_place(anchor):
             self.points.append(SplinePoint(anchor.copy(), tangent.copy() if tangent is not None else None))
 
-    def placement_anchor(self, projected, *, snap):
-        if projected is None or not self.points or not snap:
+    def placement_anchor(self, projected, *, snap, grid_spacing=0.0):
+        if projected is None or not snap:
             return projected
+        if not self.points:
+            if grid_spacing <= 0 or not isfinite(grid_spacing):
+                return projected
+            origin = self.plane.grid_origin
+            snapped = [
+                origin[axis] + floor((projected[axis] - origin[axis]) / grid_spacing + 0.5) * grid_spacing
+                for axis in range(2)
+            ]
+            return Vector((*snapped, 0))
         previous = self.points[-1].anchor
         offset = projected - previous
         radius = hypot(offset.x, offset.y)

@@ -26,10 +26,10 @@ def gizmo_highlighted(context):
 
 class VIEW3D_GGT_spline_maker_transform(bpy.types.GizmoGroup):
     bl_idname = "VIEW3D_GGT_spline_maker_transform"
-    bl_label = "Spline Maker Transform"
+    bl_label = "Splines Transform"
     bl_space_type = "VIEW_3D"
     bl_region_type = "WINDOW"
-    bl_options = {"3D"}
+    bl_options = {"3D", "SHOW_MODAL_ALL"}
 
     @classmethod
     def poll(cls, context):
@@ -55,7 +55,7 @@ class VIEW3D_GGT_spline_maker_transform(bpy.types.GizmoGroup):
                 gizmo.alpha_highlight = 1.0
                 gizmo.line_width = 2.0
                 gizmo.scale_basis = 0.8
-                gizmo.use_draw_modal = False
+                gizmo.use_draw_modal = mode != "MOVE"
                 if mode == "MOVE":
                     props = gizmo.target_set_operator("spline_maker.move_drag")
                     props.axis = axis
@@ -86,7 +86,7 @@ class VIEW3D_GGT_spline_maker_transform(bpy.types.GizmoGroup):
         self.xy_scale.scale_basis = 0.15
         self.xy_scale.use_draw_offset_scale = True
         self.xy_scale.matrix_offset.translation = (3.5, 3.5, 0)
-        self.xy_scale.use_draw_modal = False
+        self.xy_scale.use_draw_modal = True
         props = self.xy_scale.target_set_operator("spline_maker.tangent_drag")
         props.mode, props.axis = "SCALE", "XY"
         self.controls.append((self.xy_scale, "SCALE", Matrix.Identity(4), False))
@@ -101,7 +101,7 @@ class VIEW3D_GGT_spline_maker_transform(bpy.types.GizmoGroup):
             gizmo.alpha, gizmo.alpha_highlight = 0.8, 1.0
             gizmo.line_width = 2.0
             gizmo.scale_basis = 0.95 if mode == "ROTATE" else 0.12
-            gizmo.use_draw_modal = False
+            gizmo.use_draw_modal = mode != "MOVE"
             if mode == "MOVE":
                 gizmo.target_set_operator("spline_maker.move_drag").axis = "VIEW"
             else:
@@ -111,22 +111,29 @@ class VIEW3D_GGT_spline_maker_transform(bpy.types.GizmoGroup):
             self.controls.append((gizmo, mode, Matrix.Identity(4), True))
 
     def draw_prepare(self, context):
-        _groups[viewport_key(context)] = self
+        key = viewport_key(context)
+        _groups[key] = self
         mode = active_mode(context)
         origin = move_origin(context)
+        transform = tangent_drag._active
+        transforming_here = transform is not None and transform.mode == mode and transform.key == key
         from .segment_selection import composite
         for gizmo, target, basis, view_facing in self.controls:
-            # The drag owns the live preview. Do not draw a second, offset
-            # native arrow while the operation is moving the selection.
             gizmo.hide = (origin is None or mode != target or edit_drag._active is not None
-                          or tangent_drag._active is not None
+                          or (transform is not None and not transforming_here)
                           or (gizmo is getattr(self, "xy_scale", None) and not composite(context)))
             if not gizmo.hide:
-                gizmo.matrix_basis = (
-                    context.region_data.view_rotation.to_matrix().to_4x4()
-                    if view_facing else basis.copy()
+                if view_facing:
+                    orientation = context.region_data.view_rotation
+                    if transforming_here and mode == "ROTATE" and transform.axis == "VIEW":
+                        # The active outer ring keeps the axis captured at press.
+                        orientation = transform.axis_world.to_track_quat("Z", "Y")
+                    gizmo.matrix_basis = orientation.to_matrix().to_4x4()
+                else:
+                    gizmo.matrix_basis = basis.copy()
+                gizmo.matrix_basis.translation = (
+                    transform.center_world if transforming_here else context.edit_object.matrix_world @ origin
                 )
-                gizmo.matrix_basis.translation = context.edit_object.matrix_world @ origin
 
     def refresh(self, context):
         self.draw_prepare(context)

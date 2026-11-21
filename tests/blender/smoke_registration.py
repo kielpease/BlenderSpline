@@ -66,15 +66,27 @@ def assert_enabled(module, menu):
     assert menu.draw._draw_funcs.count(module.ui.draw_curve_add_menu) == 1
     keymaps = bpy.context.window_manager.keyconfigs.addon.keymaps
     assert bpy.context.window_manager.spline_maker_selection_level == "VERTEX"
+    edit_panel = module.feasibility.VIEW3D_PT_spline_maker_probe
+    info_panel = module.feasibility.VIEW3D_PT_spline_maker_edit_info
+    assert edit_panel.bl_category == "Splines" and module.ui.VIEW3D_PT_spline_maker.bl_category == "Splines"
+    assert info_panel.bl_parent_id == edit_panel.__name__ and "DEFAULT_CLOSED" in info_panel.bl_options
+    icons = bpy.types.UILayout.bl_rna.functions["operator"].parameters["icon"].enum_items.keys()
+    for key, mode, label in module.feasibility.TOOLS:
+        assert module.feasibility.TOOL_ICONS[mode] in icons
+        assert module.feasibility.SPLINE_MAKER_OT_switch_tangent_tool.description(
+            bpy.context, SimpleNamespace(target=mode)
+        ) == f"{label} ({key})"
     for name in ("Curve", "3D View"):
         assert {(item.type, item.value) for item in keymaps[name].keymap_items
-                if item.idname == "spline_maker.exit_edit_shortcut"} == {("ESC", "PRESS"), ("FOUR", "PRESS")}
-        assert {(item.type, item.properties.target) for item in keymaps[name].keymap_items
-                if item.idname in {"spline_maker.selection_level", "spline_maker.enter_selection_level"}} == {("ONE", "VERTEX"), ("TWO", "SEGMENT"), ("THREE", "REGION")}
+                if item.idname == "spline_maker.exit_edit_shortcut"} == {
+                    ("ESC", "PRESS"), ("RET", "PRESS"), ("NUMPAD_ENTER", "PRESS")
+                }
         assert not any(item.type == "FIVE" and item.idname.startswith("spline_maker.")
                        for item in keymaps[name].keymap_items)
         assert {(item.type, item.properties.target) for item in keymaps[name].keymap_items
-                if item.idname == "spline_maker.enter_selection_level"} == {("ONE", "VERTEX"), ("TWO", "SEGMENT"), ("THREE", "REGION")}
+                if item.idname == "spline_maker.enter_selection_level"} == {
+                    ("ONE", "VERTEX"), ("TWO", "SEGMENT"), ("THREE", "REGION"), ("FOUR", "WHOLE")
+                }
     for name in ("Object Non-modal", "Object Mode", "Curve", "3D View"):
         assert [(item.type, item.value) for item in keymaps[name].keymap_items
                 if item.idname == "spline_maker.enter_edit"] == [("SIX", "PRESS")]
@@ -151,7 +163,7 @@ def assert_disabled(module, menu):
     assert not hasattr(bpy.types.WindowManager, "spline_maker_bright_curves")
     assert module.display._handler is None
     keymaps = bpy.context.window_manager.keyconfigs.addon.keymaps
-    assert not any("Spline Maker" in keymap.name for keymap in keymaps)
+    assert not any("Spline Maker" in keymap.name or "Splines" in keymap.name for keymap in keymaps)
     assert not any(item.idname == "spline_maker.tool_shortcut"
                    for item in keymaps["Curve"].keymap_items)
     assert not any(item.idname == "spline_maker.tool_shortcut"
@@ -554,10 +566,10 @@ def assert_edit_interactions(drag, picking, editing):
             window_manager=SimpleNamespace(modal_handler_add=lambda _: None),
         )
 
-        def event(kind, pixel, value="PRESS"):
+        def event(kind, pixel, value="PRESS", *, shift=False, alt=False):
             return SimpleNamespace(type=kind, value=value, mouse_x=pixel[0], mouse_y=pixel[1],
                                    mouse_region_x=pixel[0], mouse_region_y=pixel[1],
-                                   shift=False, ctrl=False, alt=False)
+                                   shift=shift, ctrl=False, alt=alt)
 
         def gesture():
             operator = SimpleNamespace()
@@ -618,6 +630,80 @@ def assert_edit_interactions(drag, picking, editing):
                 drag.restore(first, state)
                 assert drag.snapshot(first) == state
 
+            def pixel_at(local):
+                screen = view3d_utils.location_3d_to_region_2d
+                return screen(fake.region, fake.region_data, obj.matrix_world @ local)
+
+            picking.clear_selection((first, second))
+            first.select_control_point = True
+            before = geometry()
+            cls = drag.SPLINE_MAKER_OT_move_drag
+            for axis, index in (("X", 0), ("Y", 1), ("XY", 0), ("VIEW", 1)):
+                op = SimpleNamespace(axis=axis, report=lambda *_: None)
+                op.update = lambda ctx, evt: cls.update(op, ctx, evt)
+                op.finish = lambda ctx, **kwargs: cls.finish(op, ctx, **kwargs)
+                start = pixel_at(first.co)
+                proposed = first.co.copy()
+                assert cls.invoke(op, fake, event("LEFTMOUSE", start)) == {"RUNNING_MODAL"}
+                proposed[index] = second.co[index] - 0.5
+                assert cls.modal(op, fake, event("MOUSEMOVE", pixel_at(proposed), "NOTHING",
+                                                  shift=True)) == {"RUNNING_MODAL"}
+                assert (first.co - proposed).length < 1e-5
+                proposed[index] = second.co[index] - 0.15
+                end = pixel_at(proposed)
+                assert cls.modal(op, fake, event("MOUSEMOVE", end, "NOTHING")) == {"RUNNING_MODAL"}
+                assert (first.co - proposed).length < 1e-5
+                assert cls.modal(op, fake, event("LEFT_SHIFT", end, shift=True)) == {"RUNNING_MODAL"}
+                assert abs(first.co[index] - second.co[index]) < 1e-5
+                assert all(abs(first.co[i] - proposed[i]) < 1e-5 for i in range(3) if i != index)
+                assert cls.modal(op, fake, event("LEFT_SHIFT", end, "RELEASE")) == {"RUNNING_MODAL"}
+                assert (first.co - proposed).length < 1e-5
+                assert cls.modal(op, fake, event("ESC", end)) == {"CANCELLED"}
+                assert geometry() == before
+
+            op, cls = gesture()
+            start = pixel_at(first.handle_right)
+            chord = second.co - first.co
+            candidate = first.co + 0.4 * chord + Vector((0, 0.2, 0))
+            end = pixel_at(candidate)
+            assert cls.invoke(op, fake, event("LEFTMOUSE", start)) == {"RUNNING_MODAL"}
+            distant = candidate + Vector((0, 0.5, 0))
+            assert cls.modal(op, fake, event("MOUSEMOVE", pixel_at(distant), "NOTHING",
+                                              shift=True)) == {"RUNNING_MODAL"}
+            assert (first.handle_right - distant).length < 1e-5
+            assert cls.modal(op, fake, event("MOUSEMOVE", end, "NOTHING")) == {"RUNNING_MODAL"}
+            assert (first.handle_right - candidate).length < 1e-5
+            assert cls.modal(op, fake, event("LEFT_SHIFT", end, shift=True)) == {"RUNNING_MODAL"}
+            assert (first.handle_right - first.co).cross(chord).length < 1e-5
+            assert cls.modal(op, fake, event("LEFT_SHIFT", end, "RELEASE")) == {"RUNNING_MODAL"}
+            assert (first.handle_right - candidate).length < 1e-5
+            preview = geometry()
+            assert cls.modal(op, fake, event("RIGHTMOUSE", end, alt=True)) == {"PASS_THROUGH"}
+            projection = fake.region_data.perspective_matrix.copy()
+            fake.region_data.perspective_matrix[0][0] *= 1.5
+            rebased = end + Vector((25, 30))
+            assert cls.modal(op, fake, event("MOUSEMOVE", rebased, "NOTHING")) == {"RUNNING_MODAL"}
+            assert geometry() == preview
+            cls.modal(op, fake, event("MOUSEMOVE", rebased + Vector((30, 0)), "NOTHING"))
+            assert first.co == before[0][0] and first.handle_right != preview[0][2]
+            assert cls.modal(op, fake, event("ESC", end)) == {"CANCELLED"}
+            assert geometry() == before
+            fake.region_data.perspective_matrix = projection
+            for delta, axis in ((Vector((1.5, 0.12, 0)), 1), (Vector((0.12, 1.7, 0)), 0)):
+                op, cls = gesture()
+                end = pixel_at(first.co + delta)
+                assert cls.invoke(op, fake, event("LEFTMOUSE", start)) == {"RUNNING_MODAL"}
+                assert cls.modal(op, fake, event("MOUSEMOVE", end, "NOTHING",
+                                                  shift=True)) == {"RUNNING_MODAL"}
+                assert abs(first.handle_right[axis] - first.co[axis]) < 1e-5
+                assert cls.modal(op, fake, event("ESC", end)) == {"CANCELLED"}
+                assert geometry() == before
+            spline = obj.data.splines[0]
+            assert drag.handle_neighbor(spline, 0, "handle_left") is None
+            spline.use_cyclic_u = True
+            assert drag.handle_neighbor(spline, 0, "handle_left") == second.co
+            spline.use_cyclic_u = False
+
             # Simulate axis/plane Move on real curve data after object transforms.
             obj.rotation_euler.z = 0.4
             obj.scale = (2, 0.5, 1)
@@ -644,6 +730,19 @@ def assert_edit_interactions(drag, picking, editing):
                 for point, state in zip((first, second), before):
                     assert (obj.matrix_world.to_3x3() @ (point.co - state[0]) - world_delta).length < 1e-5
                     assert ((point.handle_left - point.co) - (state[1] - state[0])).length < 1e-5
+                preview = geometry()
+                assert cls.modal(op, fake, event("WHEELUPMOUSE", (560, 400))) == {"PASS_THROUGH"}
+                projection = fake.region_data.perspective_matrix.copy()
+                fake.region_data.perspective_matrix[0][0] *= 1.25
+                cls.modal(op, fake, event("MOUSEMOVE", (600, 420), "NOTHING"))
+                assert geometry() == preview
+                cls.modal(op, fake, event("MOUSEMOVE", (630, 450), "NOTHING"))
+                assert geometry() != preview
+                resumed = obj.matrix_world.to_3x3() @ (first.co - preview[0][0])
+                for index, letter in enumerate("XYZ"):
+                    if axis != "VIEW" and letter not in axis:
+                        assert abs(resumed[index]) < 1e-5
+                fake.region_data.perspective_matrix = projection
                 assert cls.modal(op, fake, event("RIGHTMOUSE", (560, 400))) == {"CANCELLED"}
                 assert geometry() == before and drag._active is None
             # An orthographic view cannot disambiguate depth-axis dragging.
@@ -669,6 +768,7 @@ def assert_drawing_probe(probe, editing):
     assert_view_projection(probe)
     assert_mixed_spline(probe)
     assert_shift_constraint(probe)
+    assert_first_point_grid_snap(probe)
     assert_closing_spline(probe)
 
     toolbar = ToolSelectPanelHelper._tool_class_from_space_type("VIEW_3D")
@@ -884,6 +984,7 @@ def assert_closing_spline(probe):
     operator = SimpleNamespace(
         session=session, placement=None, close_pressed=False, target=(),
         context_key=lambda _: (), screen_position=lambda *_: hit,
+        project=lambda _, pixel: Vector(((pixel[0] - hit[0]) / 20, (pixel[1] - hit[1]) / 20, 0)),
         cleanup=session.cancel, report=lambda *_: None,
     )
     operator.over_first_vertex = lambda ctx, pixel: operator_class.over_first_vertex(operator, ctx, pixel)
@@ -910,11 +1011,11 @@ def assert_closing_spline(probe):
         assert len(session.points) == 2
         session.place(last)
         assert send("RIGHTMOUSE", alt=True) == {"PASS_THROUGH"}
-        assert send("LEFTMOUSE") == {"RUNNING_MODAL"}
-        assert send("LEFTMOUSE", "RELEASE", pixel=(240, 200)) == {"RUNNING_MODAL"}
+        assert send("LEFTMOUSE", pixel=(209, 200)) == {"RUNNING_MODAL"}
+        assert send("LEFTMOUSE", "RELEASE", pixel=(212, 200)) == {"RUNNING_MODAL"}
         assert set(bpy.data.objects) == before
         assert send("LEFTMOUSE", pixel=(206, 208)) == {"RUNNING_MODAL"}
-        assert send("LEFTMOUSE", "RELEASE") == {"FINISHED"}
+        assert send("LEFTMOUSE", "RELEASE", pixel=(206, 208)) == {"FINISHED"}
     finally:
         probe._active = None
 
@@ -930,6 +1031,78 @@ def assert_closing_spline(probe):
     assert end.handle_right_type == "VECTOR"
     expected = plane.to_world(last + (first - last) / 3)
     assert (obj.matrix_world @ end.handle_right - expected).length < 1e-5
+
+    before = set(bpy.data.objects)
+    for cancel in (True, False):
+        session.place(first)
+        session.place(Vector((5, 0, 0)))
+        session.place(last)
+        probe._active = operator
+        try:
+            assert send("LEFTMOUSE", pixel=(206, 200)) == {"RUNNING_MODAL"}
+            assert send("MOUSEMOVE", "NOTHING", pixel=(246, 180)) == {"RUNNING_MODAL"}
+            assert operator.placement.point.anchor == first
+            assert len(session.points) == 3 and session.points[0].tangent is None
+            if cancel:
+                assert send("ESC") == {"CANCELLED"}
+                assert set(bpy.data.objects) == before and not session.points
+                operator.placement = None
+                operator.close_pressed = False
+            else:
+                assert send("LEFTMOUSE", "RELEASE", pixel=(246, 180)) == {"FINISHED"}
+        finally:
+            probe._active = None
+
+    obj = bpy.context.view_layer.objects.active
+    assert set(bpy.data.objects) - before == {obj}
+    bpy.context.view_layer.update()
+    spline = obj.data.splines[0]
+    assert spline.use_cyclic_u and len(spline.bezier_points) == 3
+    start = spline.bezier_points[0]
+    pulled = Vector((2, -1, 0))
+    assert start.handle_left_type == start.handle_right_type == "ALIGNED"
+    assert (obj.matrix_world @ start.co - plane.to_world(first)).length < 1e-5
+    assert (obj.matrix_world @ start.handle_left - plane.to_world(first - pulled)).length < 1e-5
+    assert (obj.matrix_world @ start.handle_right - plane.to_world(first + pulled)).length < 1e-5
+
+
+def assert_first_point_grid_snap(probe):
+    overlay = SimpleNamespace(grid_scale_unit=1.0, grid_subdivisions=10)
+    view = SimpleNamespace(is_orthographic_side_view=True, view_rotation=Quaternion(),
+                           window_matrix=Matrix.Diagonal((0.16, 0.16, -0.1, 1)))
+    units = SimpleNamespace(system="NONE")
+    context = SimpleNamespace(
+        space_data=SimpleNamespace(overlay=overlay), region_data=view,
+        scene=SimpleNamespace(unit_settings=units), region=SimpleNamespace(width=1000),
+    )
+    for rotation, normal in ((Quaternion(), 2), (Quaternion((1, 0, 0), radians(90)), 1),
+                             (Quaternion((1, 1, 1), radians(120)), 0)):
+        plane = probe.DrawingPlane(Vector((0.27, -1.34, 3.73)), rotation)
+        view.view_rotation = rotation
+        session = probe.DrawingSession(plane)
+        raw = Vector((1.21, -0.98, 0))
+        assert abs(probe.viewport_grid_spacing(context, plane) - 0.1) < 1e-6
+        snapped = probe.placement_anchor(context, session, raw, True)
+        world = plane.to_world(snapped)
+        for axis in range(3):
+            coordinate = world[axis]
+            if axis == normal:
+                assert abs(coordinate - plane.origin[axis]) < 1e-5
+            else:
+                assert abs(coordinate / 0.1 - round(coordinate / 0.1)) < 1e-5
+        assert probe.placement_anchor(context, session, raw, False) == raw
+        session.place(snapped)
+        proposed = snapped + Vector((1.01, 0.2, 0))
+        angular = probe.placement_anchor(context, session, proposed, True)
+        assert abs(angular.y - snapped.y) < 1e-5
+        assert abs((angular - snapped).length - (proposed - snapped).length) < 1e-5
+
+    units.system = "METRIC"
+    overlay.grid_scale_unit = 2.5
+    assert probe.viewport_grid_spacing(context, plane) == 2.5
+    view.is_orthographic_side_view = False
+    units.system = "NONE"
+    assert probe.viewport_grid_spacing(context, plane) == 2.5
 
 
 def assert_view_projection(probe):

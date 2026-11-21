@@ -1,14 +1,69 @@
 """Tangent and selection-center transforms with one undo boundary per drag."""
 
-from math import atan2
+from math import atan2, copysign, degrees, floor, radians
 
 import bpy
 from bpy_extras.view3d_utils import location_3d_to_region_2d
 from mathutils import Matrix, Vector
 
-from .feasibility import active_mode, selected_vertex_handles
+from .feasibility import active_mode, move_origin, selected_vertex_handles
+from .edit_snapping import SHIFT_KEYS
+from .drag_navigation import DragNavigation
 
 _active = None
+
+
+def snap_angle(angle):
+    magnitude = abs(degrees(angle))
+    ten_degree_stop = 10 * floor(magnitude / 10 + 0.5)
+    diagonal_stop = 45 * floor(magnitude / 45 + 0.5)
+    nearest = min((ten_degree_stop, diagonal_stop), key=lambda stop: abs(stop - magnitude))
+    return radians(copysign(nearest, angle))
+
+
+def snap_scale(factor):
+    return max(0.01, floor(factor * 100 + 0.5) / 100)
+
+
+def transform_readout(mode, amount, *, snapped):
+    precision = 0 if snapped else 1
+    if mode == "ROTATE":
+        return f"Rotate {degrees(amount) + 0.0:.{precision}f}°"
+    return f"Scale {amount * 100:.{precision}f}%"
+
+
+def scale_direction(context, center, center_world, axis, axis_world):
+    direction = Vector((1, 1, 0)).normalized() if axis == "XY" else axis_world
+    end = location_3d_to_region_2d(context.region, context.region_data, center_world + direction)
+    if center is None or end is None:
+        return Vector((0, 0))
+    return (end - center).normalized()
+
+
+def uses_selection_center(context, mode):
+    from .segment_selection import composite
+    return composite(context) or (
+        mode == "ROTATE"
+        and getattr(context.window_manager, "spline_maker_vertex_rotation", "TANGENTS") == "GROUP"
+    )
+
+
+def register_settings():
+    bpy.types.WindowManager.spline_maker_vertex_rotation = bpy.props.EnumProperty(
+        name="Vertex Rotation",
+        items=(
+            ("TANGENTS", "Tangents", "Rotate the handles about each selected anchor"),
+            ("GROUP", "Group", "Rotate selected anchors and handles about their average position"),
+        ),
+        default="TANGENTS",
+        options={"SKIP_SAVE"},
+    )
+
+
+def unregister_settings():
+    for manager in bpy.data.window_managers:
+        manager.property_unset("spline_maker_vertex_rotation")
+    del bpy.types.WindowManager.spline_maker_vertex_rotation
 
 
 def has_selection(context):
@@ -82,7 +137,7 @@ class SPLINE_MAKER_OT_tangent_drag(bpy.types.Operator):
     bl_idname = "spline_maker.tangent_drag"
     bl_label = "Rotate or Scale Spline Selection"
     bl_description = "Transform vertex tangents, or selected geometry about its center; Esc cancels"
-    bl_options = {"UNDO", "BLOCKING"}
+    bl_options = {"UNDO"}
 
     mode: bpy.props.EnumProperty(items=(("ROTATE", "Rotate", ""), ("SCALE", "Scale", "")))
     axis: bpy.props.EnumProperty(items=tuple((axis, axis if axis == "XY" else axis.title(), "")
@@ -102,17 +157,21 @@ class SPLINE_MAKER_OT_tangent_drag(bpy.types.Operator):
         self.snapshot = capture(context)
         if not self.snapshot:
             return {"CANCELLED"}
-        from .segment_selection import composite
-        self.pivot = (sum((state[2] for state in self.snapshot), Vector()) / len(self.snapshot)
-                      if composite(context) else None)
+        center = move_origin(context)
+        self.pivot = center if uses_selection_center(context, self.mode) else None
         self.key = tuple(x.as_pointer() for x in (context.window, context.area, context.region))
-        self.center_world = self.obj.matrix_world @ (self.pivot if self.pivot is not None else self.snapshot[0][2])
+        self.center_world = self.obj.matrix_world @ center
         self.center = location_3d_to_region_2d(context.region, context.region_data, self.center_world)
         if self.center is None or abs(self.obj.matrix_world.determinant()) < 1e-12:
             self.report({"WARNING"}, "Transform needs a visible selection center and nonzero object scale")
             return {"CANCELLED"}
         self.previous_vector = None
         self.angle = 0.0
+        self.applied_angle = 0.0
+        self.factor = self.base_factor = 1.0
+        self.navigation = DragNavigation(context)
+        self.readout = transform_readout(self.mode, 0.0 if self.mode == "ROTATE" else 1.0,
+                                         snapped=getattr(event, "shift", False))
         self.start_pixel = Vector((event.mouse_region_x, event.mouse_region_y))
         self.changed = False
         self.world = self.obj.matrix_world.to_3x3().copy()
@@ -121,10 +180,8 @@ class SPLINE_MAKER_OT_tangent_drag(bpy.types.Operator):
                            if self.axis in {"VIEW", "UNIFORM"}
                            else Vector((0, 0, 1)) if self.axis == "XY"
                            else Vector(tuple(float(axis == self.axis) for axis in "XYZ")))
-        screen_direction = Vector((1, 1, 0)).normalized() if self.axis == "XY" else self.axis_world
-        end = location_3d_to_region_2d(context.region, context.region_data, self.center_world + screen_direction)
-        self.screen_axis = (end - self.center).normalized() if end is not None else Vector((1, 0))
-        if self.mode == "SCALE" and self.axis in {"X", "Y", "Z", "XY"} and self.screen_axis.length < 1e-6:
+        self.screen_axis = scale_direction(context, self.center, self.center_world, self.axis, self.axis_world)
+        if self.mode == "SCALE" and self.axis in {"X", "Y", "Z", "XY"} and not self.screen_axis.length:
             self.report({"WARNING"}, "This scale axis faces the view; orbit or use the center box")
             return {"CANCELLED"}
         if self.mode == "SCALE" and self.axis == "XY" and abs(
@@ -141,50 +198,61 @@ class SPLINE_MAKER_OT_tangent_drag(bpy.types.Operator):
         return {"RUNNING_MODAL"}
 
     def update(self, context, event):
-        offset = Vector((event.mouse_region_x, event.mouse_region_y)) - self.center
+        pixel = Vector((event.mouse_region_x, event.mouse_region_y))
+        rebase = self.navigation.rebase(context)
+        if rebase:
+            self.center = location_3d_to_region_2d(context.region, context.region_data, self.center_world)
+            self.previous_vector = None
+            self.angle = self.applied_angle
+            self.start_pixel = pixel
+            self.base_factor = self.factor
+            self.screen_axis = scale_direction(context, self.center, self.center_world, self.axis, self.axis_world)
+        if self.center is None:
+            return
+        snapped = getattr(event, "shift", False)
         if self.mode == "ROTATE":
-            if offset.length < 5:
+            if (pixel - self.center).length >= 5:
+                from .edit_drag import project
+                hit = project(context, pixel, self.center_world, self.axis_world)
+                if hit is not None and (hit - self.center_world).length > 1e-8:
+                    current = (hit - self.center_world).normalized()
+                    if self.previous_vector is not None:
+                        self.angle += atan2(self.axis_world.dot(self.previous_vector.cross(current)),
+                                            self.previous_vector.dot(current))
+                    self.previous_vector = current
+            if rebase:
                 return
-            pixel = (event.mouse_region_x, event.mouse_region_y)
-            from .edit_drag import project
-            hit = project(context, pixel, self.center_world, self.axis_world)
-            if hit is None or (hit - self.center_world).length < 1e-8:
-                return
-            current = (hit - self.center_world).normalized()
-            if self.previous_vector is None:
-                self.previous_vector = current
-                return
-            self.angle += atan2(self.axis_world.dot(self.previous_vector.cross(current)),
-                                self.previous_vector.dot(current))
-            self.previous_vector = current
-            if abs(self.angle) < 1e-6:
-                if self.changed:
-                    restore(self.data, self.snapshot)
-                    context.area.tag_redraw()
-                self.changed = False
-                return
-            matrix = self.inverse @ Matrix.Rotation(self.angle, 3, self.axis_world) @ self.world
+            angle = snap_angle(self.angle) if snapped else self.angle
+            self.applied_angle = angle
+            self.readout = transform_readout(self.mode, angle, snapped=snapped)
+            changed = abs(angle) >= 1e-6
+            world_transform = Matrix.Rotation(angle, 3, self.axis_world)
         else:
+            if rebase:
+                return
+            delta = pixel - self.start_pixel
             if self.axis in {"X", "Y", "Z", "XY"}:
-                delta = Vector((event.mouse_region_x, event.mouse_region_y)) - self.start_pixel
-                factor = max(1 + delta.dot(self.screen_axis) / 80, 0.01)
+                if not self.screen_axis.length:
+                    return
+                factor = max(self.base_factor + delta.dot(self.screen_axis) / 80, 0.01)
             else:
                 # Center control starts at the pivot; use a screen diagonal
                 # delta instead of a distance ratio to avoid a first-move jump.
-                delta = Vector((event.mouse_region_x, event.mouse_region_y)) - self.start_pixel
-                factor = max(1 + (delta.x + delta.y) / 160, 0.01)
-            if abs(factor - 1) < 1e-6:
-                if self.changed:
-                    restore(self.data, self.snapshot)
-                    context.area.tag_redraw()
-                self.changed = False
-                return
-            world_scale = (Matrix.Diagonal((factor, factor, 1)) if self.axis == "XY"
-                           else Matrix.Scale(factor, 3, self.axis_world) if self.axis in {"X", "Y", "Z"}
-                           else Matrix.Scale(factor, 3))
-            matrix = self.inverse @ world_scale @ self.world
-        apply(self.data, self.snapshot, matrix, rotating=self.mode == "ROTATE", pivot=self.pivot)
-        self.changed = True
+                factor = max(self.base_factor + (delta.x + delta.y) / 160, 0.01)
+            if snapped:
+                factor = snap_scale(factor)
+            self.factor = factor
+            self.readout = transform_readout(self.mode, factor, snapped=snapped)
+            changed = abs(factor - 1) >= 1e-6
+            world_transform = (Matrix.Diagonal((factor, factor, 1)) if self.axis == "XY"
+                               else Matrix.Scale(factor, 3, self.axis_world) if self.axis in {"X", "Y", "Z"}
+                               else Matrix.Scale(factor, 3))
+        if changed:
+            matrix = self.inverse @ world_transform @ self.world
+            apply(self.data, self.snapshot, matrix, rotating=self.mode == "ROTATE", pivot=self.pivot)
+        elif self.changed:
+            restore(self.data, self.snapshot)
+        self.changed = changed
         context.area.tag_redraw()
 
     def finish(self, context, *, cancel):
@@ -209,9 +277,12 @@ class SPLINE_MAKER_OT_tangent_drag(bpy.types.Operator):
         if (context.edit_object != self.obj or context.mode != "EDIT_CURVE"
                 or tuple(x.as_pointer() for x in (context.window, context.area, context.region)) != self.key):
             return self.finish(context, cancel=True)
-        if event.type in {"ESC", "RIGHTMOUSE", "WINDOW_DEACTIVATE"} or (event.ctrl and event.type == "Z"):
+        if self.navigation.forward(event):
+            return {"PASS_THROUGH"}
+        if (event.type in {"ESC", "WINDOW_DEACTIVATE"} or (event.ctrl and event.type == "Z")
+                or (event.type == "RIGHTMOUSE" and event.value == "PRESS")):
             return self.finish(context, cancel=True)
-        if event.type in {"MOUSEMOVE", "INBETWEEN_MOUSEMOVE"}:
+        if event.type in {"MOUSEMOVE", "INBETWEEN_MOUSEMOVE"} | SHIFT_KEYS:
             self.update(context, event)
         elif event.type == "LEFTMOUSE" and event.value == "RELEASE":
             self.update(context, event)

@@ -176,14 +176,29 @@ ZIP validation, focused control/transform checks and the complete background sui
 
 The owner subsequently confirms 0.15.2 works great, accepting the XY scale control overall and requesting a committed home-session handoff. Individual edge cases were not separately reported.
 
-## SM-016 resume procedure
+## SM-016 interaction integration
 
-Resume from the accepted 0.15.2 baseline. Existing synthetic tests establish rollback and native undo data, but not physical event routing or one UI history entry per gesture.
+The 0.16.0 ZIP validation and full background suite passed on Blender 5.2.4 LTS for Windows. Regression tests cover preview preservation and resumed drags after a projection change, world-axis constraints, the view rotation ring, cancellation, and selection on native curve data. The transform suite exercises parented and nonuniformly scaled curves across the selection levels.
 
-1. Check orbit/pan/zoom while Q/W/E/R are idle, then during box selection, direct-handle drags and active Move/Rotate/Scale. Code inspection shows transform modals consume unhandled events; investigate dispatch and stable projection before changing that policy. Navigation must not create geometry jumps or commits.
-2. For each level, confirm a completed gesture forms one native Undo step and Redo restores it. First Esc cancels the current gesture and restores geometry/selection; the next Esc exits editing. Check right-click cancellation versus the idle vertex-type menu.
-3. Recheck XYZ, plane/view and XY scale controls on transformed/parented objects while changing the view. Tool switches and native tool exit must restore/cancel owned previews without stale gizmos or lost selection.
-4. Verify default/Industry Compatible shortcut scope, repeated Object/Edit entry, context menus and disable/re-enable cleanup. Record actual viewport results separately from background checks. Lifecycle/save-reopen beyond this integration belongs to SM-017.
+An isolated Blender viewport test used Industry Compatible input events to check zoom and pan during active gizmo and handle drags, Alt+right-mouse zoom during Scale, and wheel zoom during a marquee. One native Undo and Redo restored Whole Move immediately after entering through 6 and selecting 4 All, Spline Rotate, Segment Scale, and a Vertex handle drag. Esc and plain right-click canceled active gestures. Idle right-click opened the vertex menu, Q re-entered from native Select Box with the existing selection, and idle Esc finished editing. The default keymap passed a middle-mouse orbit during active Move.
+
+The owner [viewport check](BUILD.md#0160-interaction-integration-viewport-check) covers testing with their own curves and input devices. The viewport checks used representative controls at each level. Remaining axis and plane combinations were exercised in the background suite. Lifecycle and save/reopen belong to SM-017.
+
+### 0.15.3 edit controls
+
+ZIP validation and the full background suite passed on Blender 5.2.4 LTS for Windows. Regression checks verify the averaged Vertex Move pivot and a Group rotation that moves selected anchors and handles together on a parented, nonuniformly scaled curve. An isolated Industry Compatible Blender session verified keyboard entry with 6, 4 All in Edit Mode, and exit with Enter and Numpad Enter. Physical gizmo gestures and the panel layout remain in the [viewport check](BUILD.md#0153-edit-controls-viewport-check).
+
+The owner confirmed Group rotation on vertices. The 0.15.4 background suite exercises Shift press and release during axis and plane Move and direct handle drags, the 10-pixel threshold, open and closed handle neighbors, and Esc rollback on real curve data. Physical snapping gestures remain in the [viewport check](BUILD.md#0154-edit-snapping-viewport-check).
+
+### 0.15.5 compact controls and readouts
+
+Blender 5.2.4 LTS for Windows passed ZIP validation and background checks for icon and tooltip definitions, the default-collapsed Info panel, signed angle snaps, integer scale percentages, Shift release, and Esc rollback. An isolated Industry Compatible viewport test rendered **Rotate 45°** and **Scale 141%** in the framebuffer. The [viewport check](BUILD.md#0155-compact-controls-and-transform-readouts) covers the sidebar layout and physical gizmo gestures.
+
+The owner confirmed Shift snapping for Move and Rotate. The 0.15.6 background suite checks numeric world Y edits at all four levels on a parented, nonuniformly scaled curve and verifies horizontal, vertical, and adjoining-line handle snaps. An isolated Industry Compatible viewport test activated the outer rotation ring through Blender input events, verified that it stayed visible while the side readout rendered **Rotate 45°**, and opened and canceled the Y edit dialog.
+
+The owner confirmed the other workflows in 0.15.6 and requested persistent Scale controls and first-point grid snapping. Version 0.15.7 passed ZIP validation and the full background suite on Blender 5.2.4 LTS for Windows. An isolated Industry Compatible viewport test kept Scale visible through a gizmo drag with the side readout and placed a Shift-clicked first point on the Top grid at the original drawing depth. The [hands-on check](BUILD.md#0157-scale-and-first-point-grid-snap) covers the rest of the controls.
+
+Version 0.15.8 passed ZIP validation and the full background suite on Blender 5.2.4 LTS. The close tests cover plain click, drag closure, the pinned first anchor, the native aligned handle pair, the absence of a duplicate vertex, and Esc cancellation. An isolated Industry Compatible viewport test routed a close drag through Blender and verified the preview and resulting three-vertex loop. See the [hands-on check](BUILD.md#0158-bézier-handles-on-close).
 
 ## Transform gate
 

@@ -1,6 +1,6 @@
 """SM-015 geometry pivots, world transforms, modal rollback and native undo."""
 
-from math import cos, sin
+from math import cos, radians, sin
 from types import SimpleNamespace
 
 import bpy
@@ -77,13 +77,29 @@ def run(module):
                     assert (world @ actual - expected).length < 8e-5, (key, tuple(world @ actual), tuple(expected))
             assert obj.matrix_world == world
 
+        def assert_coordinate_edit(before, selected, pivot):
+            selection = flags()
+            shift = Vector((0, 1.25, 0))
+            assert bpy.ops.spline_maker.set_selection_coordinate(
+                axis="Y", value=(world @ pivot).y + shift.y,
+            ) == {"FINISHED"}
+            for key, point in points().items():
+                for actual, original in zip((point.co, point.handle_left, point.handle_right), before[key][:3]):
+                    expected = world @ original + shift if key in selected else world @ original
+                    assert (world @ actual - expected).length < 8e-5
+            assert obj.matrix_world == world and flags() == selection
+            for key in selected:
+                module.edit_drag.restore(points()[key], before[key])
+            assert_geometry(before)
+
         def pixel(co):
             return location_3d_to_region_2d(fake.region, fake.region_data, co)
 
-        def event(kind, point, value="PRESS", ctrl=False):
-            return SimpleNamespace(type=kind, value=value, ctrl=ctrl, mouse_region_x=point[0], mouse_region_y=point[1])
+        def event(kind, point, value="PRESS", ctrl=False, shift=False):
+            return SimpleNamespace(type=kind, value=value, ctrl=ctrl, shift=shift,
+                                   mouse_region_x=point[0], mouse_region_y=point[1])
 
-        def begin(mode, axis):
+        def begin(mode, axis, *, angle=0.4):
             bpy.ops.spline_maker.switch_tangent_tool(target=mode)
             op = SimpleNamespace(mode=mode, axis=axis, report=lambda *_: None)
             op.update = lambda ctx, evt: cls.update(op, ctx, evt)
@@ -98,7 +114,6 @@ def run(module):
                 start = pixel(pivot + Vector((1, 1, 0)))
             assert cls.invoke(op, fake, event("LEFTMOUSE", start)) == {"RUNNING_MODAL"}, (mode, axis)
             if mode == "ROTATE":
-                angle = 0.4
                 end = pixel(pivot + 2 * (cos(angle) * u + sin(angle) * normal.cross(u)))
                 matrix = Matrix.Rotation(angle, 3, normal)
             elif axis in {"X", "Y", "Z", "XY"}:
@@ -110,6 +125,59 @@ def run(module):
             return op, start, end, matrix
 
         try:
+            bpy.ops.spline_maker.enter_selection_level(target="VERTEX")
+            fake.window_manager.spline_maker_selection_level = "VERTEX"
+            selected = {(0, 0), (0, 2)}
+            for key, point in points().items():
+                point.select_control_point = key in selected
+                point.select_left_handle = point.select_right_handle = False
+            before, selection = geometry(), flags()
+            pivot = (before[(0, 0)][0] + before[(0, 2)][0]) / 2
+            assert (module.feasibility.move_origin(fake) - pivot).length < 1e-6
+            assert_coordinate_edit(before, selected, pivot)
+            assert not drag.uses_selection_center(fake, "ROTATE")
+            fake.window_manager.spline_maker_vertex_rotation = "GROUP"
+            assert not drag.uses_selection_center(fake, "SCALE")
+            op, _, end, matrix = begin("ROTATE", "Z")
+            assert (op.pivot - pivot).length < 1e-6
+            assert cls.modal(op, fake, event("LEFTMOUSE", end, "RELEASE")) == {"FINISHED"}
+            assert_transformed(before, selected, pivot, matrix)
+            assert flags() == selection
+            drag.restore(obj.data, op.snapshot)
+            assert_geometry(before)
+
+            op, _, end, free = begin("ROTATE", "Z", angle=radians(44))
+            cls.modal(op, fake, event("MOUSEMOVE", end))
+            assert op.readout == "Rotate 44.0°"
+            assert_transformed(before, selected, pivot, free)
+            cls.modal(op, fake, event("LEFT_SHIFT", end, shift=True))
+            assert op.readout == "Rotate 45°"
+            assert_transformed(before, selected, pivot, Matrix.Rotation(radians(45), 3, "Z"))
+            cls.modal(op, fake, event("LEFT_SHIFT", end, "RELEASE"))
+            assert_transformed(before, selected, pivot, free)
+            assert cls.modal(op, fake, event("ESC", end)) == {"CANCELLED"}
+            assert_geometry(before)
+            for source, target in ((-44, -45), (87, 90), (64, 60), (101, 100), (405, 405)):
+                assert abs(drag.snap_angle(radians(source)) - radians(target)) < 1e-6
+
+            op, start, _, _ = begin("SCALE", "UNIFORM")
+            end = start + Vector((62, 3))
+            cls.modal(op, fake, event("MOUSEMOVE", end))
+            assert op.readout == "Scale 140.6%"
+            cls.modal(op, fake, event("RIGHT_SHIFT", end, shift=True))
+            assert op.readout == "Scale 141%"
+            for key in selected:
+                point = points()[key]
+                anchor, left, right = before[key][:3]
+                assert (point.co - anchor).length < 1e-6
+                assert (point.handle_left - (anchor + 1.41 * (left - anchor))).length < 1e-5
+                assert (point.handle_right - (anchor + 1.41 * (right - anchor))).length < 1e-5
+            cls.modal(op, fake, event("RIGHT_SHIFT", end, "RELEASE"))
+            assert op.readout == "Scale 140.6%"
+            assert cls.modal(op, fake, event("ESC", end)) == {"CANCELLED"}
+            assert_geometry(before)
+            del fake.window_manager.spline_maker_vertex_rotation
+
             for level, selected in (("SEGMENT", {(0, 0), (0, 1), (0, 2)}),
                                     ("REGION", {(1, 0), (1, 1), (1, 2)}),
                                     ("WHOLE", set(points()))):
@@ -127,6 +195,7 @@ def run(module):
                 assert len(snapshot) == len(selected)  # Shared segment endpoint once.
                 pivot = sum((before[key][0] for key in selected), Vector()) / len(selected)
                 assert (module.feasibility.move_origin(fake) - pivot).length < 1e-6
+                assert_coordinate_edit(before, selected, pivot)
                 matrices = [(Matrix.Rotation(0.6, 3, axis), True) for axis in "XYZ"]
                 matrices += [(Matrix.Scale(1.6, 3, Vector((1, 0, 0))), False), (Matrix.Scale(0.6, 3), False),
                              (Matrix.Diagonal((1.6, 1.6, 1)), False)]
@@ -147,10 +216,36 @@ def run(module):
                         assert_transformed(before, selected, pivot, matrix)
                         cls.modal(op, fake, event("MOUSEMOVE", end))
                         assert_transformed(before, selected, pivot, matrix)
-                        group = SimpleNamespace(controls=[(SimpleNamespace(hide=False), mode, Matrix.Identity(4), False)])
+                        group = SimpleNamespace(controls=[
+                            (SimpleNamespace(hide=False), mode, Matrix.Identity(4), axis in {"VIEW", "UNIFORM"})
+                        ])
                         module.transform_gizmos.VIEW3D_GGT_spline_maker_transform.draw_prepare(group, fake)
-                        assert group.controls[0][0].hide  # Preview owns rendering.
+                        gizmo = group.controls[0][0]
+                        assert not gizmo.hide
+                        assert (gizmo.matrix_basis.translation - op.center_world).length < 1e-6
+                        preview = geometry()
+                        readout = op.readout
+                        assert cls.modal(op, fake, event("WHEELUPMOUSE", end)) == {"PASS_THROUGH"}
+                        projection = fake.region_data.perspective_matrix.copy()
+                        fake.region_data.perspective_matrix[1][1] *= 1.1
+                        rebased = end + Vector((14, -12))
+                        cls.modal(op, fake, event("MOUSEMOVE", rebased))
+                        assert_geometry(preview)
+                        assert op.readout == readout
+                        if mode == "ROTATE" and axis == "VIEW":
+                            fake.region_data.view_rotation = Euler((0.3, 0.8, 0.2)).to_quaternion()
+                            module.transform_gizmos.VIEW3D_GGT_spline_maker_transform.draw_prepare(group, fake)
+                            fake.region_data.view_rotation = view_rotation
+                            assert (gizmo.matrix_basis.to_3x3().col[2] - op.axis_world).length < 1e-6
+                        if mode == "SCALE":
+                            resumed = rebased + 35 * op.screen_axis if axis != "UNIFORM" else rebased + Vector((35, 0))
+                        else:
+                            offset = rebased - op.center
+                            resumed = op.center + Vector((-offset.y, offset.x))
+                        cls.modal(op, fake, event("MOUSEMOVE", resumed))
+                        assert op.readout != readout, (mode, axis)
                         assert cls.modal(op, fake, event("ESC", end)) == {"CANCELLED"}
+                        fake.region_data.perspective_matrix = projection
                         assert_geometry(before)
                         assert flags() == selection and drag._active is None
                     axis = "VIEW" if mode == "ROTATE" else "UNIFORM"

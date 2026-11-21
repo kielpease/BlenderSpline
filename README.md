@@ -1,8 +1,8 @@
-# Spline Maker for Blender
+# Splines for Blender
 
-Spline Maker is a Blender extension for drawing and editing native Bezier curves, inspired by the direct spline modeling workflow of 3ds Max.
+Splines is a Blender extension for drawing and editing native Bézier curves, inspired by the direct spline modeling workflow of 3ds Max.
 
-**Status:** Version 0.15.2 is accepted, including the offset XY scale square, Move/Rotate/Scale and Q Select entry fixes. ZIP validation and the full background suite pass on Blender 5.2.4 LTS. Next is SM-016 interaction integration: navigation, cancel, native Undo grouping, context menus and tool exit. See `AGENTS.md` for the home-session handoff and `docs/BUILD.md` to rebuild the Git-ignored test ZIP.
+**Status:** The stable installer contains version 0.15.2. The owner accepted the 0.15.8 Bézier closure workflow. The 0.16.0 test build integrates viewport navigation with active drags and records a native Undo checkpoint when entering Edit Mode. See `docs/BUILD.md` for the local build and viewport checks.
 
 Primary test target: Blender 5.2.4 LTS on Windows. Compatibility beyond that version is unverified.
 
@@ -19,10 +19,10 @@ Draw and edit mixed straight/Bézier outlines without memorizing an add-on-speci
 | Left click and drag | Place Bézier vertex and pull its tangent handles |
 | Shift during placement | Constrain segment direction to 45-degree increments in the drawing plane |
 | Click first vertex | Close spline when enough vertices exist |
+| Click and drag from first vertex | Close the spline and set linked Bézier handles at the seam |
 | Q / W / E / R | Select / Move / Rotate / Scale |
-| 1 / 2 / 3 | Vertex / Segment / Spline (auto-select a sole spline) |
-| 4 | Return to Object Mode |
-| Whole curve button | Select all source splines, then W moves their geometry together |
+| 1 / 2 / 3 / 4 in Edit Mode | Vertex / Segment / Spline (auto-select a sole spline) / All source splines |
+| Enter or Finish Editing | Return to Object Mode from Spline Maker Edit |
 | 5 | Preserve the owner's native Blender mode control |
 | 1 or 6 from Object Mode / Edit Spline button | Enter Vertex editing with Q Select active for a single selected editable Bezier curve |
 | Right click while editing | Vertex types and other selection-relevant commands |

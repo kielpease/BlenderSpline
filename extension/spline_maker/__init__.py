@@ -25,6 +25,7 @@ def register():
     vertex_selection.register()
     vertex_types.register()
     segment_selection.register()
+    tangent_drag.register_settings()
     bpy.types.VIEW3D_MT_curve_add.append(ui.draw_curve_add_menu)
 
 
@@ -34,6 +35,7 @@ def unregister():
     edit_drag.unregister()
     transform_gizmos.unregister()
     tangent_drag.unregister()
+    tangent_drag.unregister_settings()
     vertex_types.unregister()
     vertex_selection.unregister()
     segment_selection.unregister()

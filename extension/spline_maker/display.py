@@ -1,5 +1,6 @@
 """Readable source-curve overlay and viewport display controls."""
 
+import blf
 import bpy
 import gpu
 from bpy_extras.view3d_utils import location_3d_to_region_2d
@@ -29,8 +30,12 @@ def active(context):
 
 def draw():
     context = bpy.context
-    if not active(context):
-        return
+    if active(context):
+        draw_curves(context)
+    draw_transform_readout(context)
+
+
+def draw_curves(context):
     if context.mode == "OBJECT":
         lines = []
         for obj in object_curves(context):
@@ -52,6 +57,33 @@ def draw():
     shader = gpu.shader.from_builtin("UNIFORM_COLOR")
     draw_batch(shader, "LINES", plain, (*context.window_manager.spline_maker_curve_color, 1.0))
     draw_batch(shader, "LINES", chosen, (0.35, 0.72, 1.0, 1.0))
+
+
+def draw_transform_readout(context):
+    from .tangent_drag import _active
+    if (_active is None or context.window is None or context.area is None or context.region is None
+            or tuple(item.as_pointer() for item in (context.window, context.area, context.region)) != _active.key
+            or context.region_data is None):
+        return
+    center = location_3d_to_region_2d(context.region, context.region_data, _active.center_world)
+    if center is None:
+        return
+    font = 0
+    blf.size(font, 14)
+    width, height = blf.dimensions(font, _active.readout)
+    offset = 95 * context.preferences.system.ui_scale
+    x = center.x + offset
+    if x + width + 12 > context.region.width:
+        x = center.x - offset - width
+    x = max(8, min(x, context.region.width - width - 12))
+    y = max(8, min(center.y + 12, context.region.height - height - 18))
+    background = ((x - 6, y - 5), (x + width + 6, y - 5),
+                  (x + width + 6, y + height + 5), (x - 6, y + height + 5))
+    shader = gpu.shader.from_builtin("UNIFORM_COLOR")
+    draw_batch(shader, "TRI_FAN", background, (0.08, 0.1, 0.13, 1.0))
+    blf.position(font, x, y, 0)
+    blf.color(font, 1.0, 1.0, 1.0, 1.0)
+    blf.draw(font, _active.readout)
 
 
 def object_curves(context):

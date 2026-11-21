@@ -10,6 +10,8 @@ from mathutils import Vector
 from .drawing_probe import draw_batch
 from .feasibility import active_mode, editable_bezier_points
 from . import edit_drag, segment_selection
+from .edit_snapping import SHIFT_KEYS
+from .drag_navigation import DragNavigation
 
 
 _COMPONENTS = (
@@ -136,7 +138,7 @@ def pointer_in_viewport(context, window_pixel):
 
 class SPLINE_MAKER_OT_vertex_select(bpy.types.Operator):
     bl_idname = "spline_maker.vertex_select"
-    bl_label = "Select Spline Maker Vertices"
+    bl_label = "Select Spline Vertices"
     bl_options = {"INTERNAL", "UNDO"}
 
     @classmethod
@@ -161,6 +163,13 @@ class SPLINE_MAKER_OT_vertex_select(bpy.types.Operator):
                 for pi, point in enumerate(spline.bezier_points) if point == hit.point
             )
             self.handle_state = edit_drag.snapshot(hit.point)
+            si, pi, coordinate, _ = self.handle_key
+            neighbor = edit_drag.handle_neighbor(self.data.splines[si], pi, coordinate)
+            self.handle_anchor = self.obj.matrix_world @ hit.point.co
+            basis = self.obj.matrix_world.to_3x3()
+            self.handle_directions = [basis @ Vector((1, 0, 0)), basis @ Vector((0, 1, 0))]
+            if neighbor is not None:
+                self.handle_directions.insert(0, basis @ (neighbor - hit.point.co))
             self.selection_state = [
                 (si, pi, tuple(getattr(point, flag) for _, flag in _COMPONENTS))
                 for si, spline in enumerate(self.data.splines)
@@ -169,6 +178,7 @@ class SPLINE_MAKER_OT_vertex_select(bpy.types.Operator):
             self.plane_origin = self.obj.matrix_world @ getattr(hit.point, hit.coordinate)
             self.plane_normal = context.region_data.view_rotation @ Vector((0, 0, 1))
             self.world_start = edit_drag.project(context, pixel, self.plane_origin, self.plane_normal)
+            self.world_delta = self.base_delta = Vector((0, 0, 0))
             self.inverse = self.obj.matrix_world.inverted().to_3x3()
             if self.world_start is None:
                 return {"CANCELLED"}
@@ -179,6 +189,7 @@ class SPLINE_MAKER_OT_vertex_select(bpy.types.Operator):
             if gizmo_highlighted(context):
                 return {"PASS_THROUGH"}
         self.key = viewport_key(context)
+        self.navigation = DragNavigation(context)
         self.start = self.end = pixel
         self.extend = event.shift
         self.dragging = False
@@ -212,18 +223,37 @@ class SPLINE_MAKER_OT_vertex_select(bpy.types.Operator):
         if _gesture is not self or not selection_active(context) or viewport_key(context) != self.key:
             self.cancel(context)
             return {"CANCELLED"}
-        if (event.type in {"ESC", "RIGHTMOUSE", "WINDOW_DEACTIVATE"}
-                or (event.ctrl and event.type == "Z")):
+        if self.navigation.forward(event):
+            return {"PASS_THROUGH"}
+        if (event.type in {"ESC", "WINDOW_DEACTIVATE"} or (event.ctrl and event.type == "Z")
+                or (event.type == "RIGHTMOUSE" and event.value == "PRESS")):
             self.cancel(context)
             return {"CANCELLED"}
         releasing = event.type == "LEFTMOUSE" and event.value == "RELEASE"
-        if not releasing and event.type not in {"MOUSEMOVE", "INBETWEEN_MOUSEMOVE"}:
+        shift_changed = self.dragging and self.handle_key is not None and event.type in SHIFT_KEYS
+        if not releasing and not shift_changed and event.type not in {"MOUSEMOVE", "INBETWEEN_MOUSEMOVE"}:
             return {"PASS_THROUGH"}
         region = context.region
-        self.end = (
+        pixel = (
             min(max(event.mouse_x - region.x, 0), region.width - 1),
             min(max(event.mouse_y - region.y, 0), region.height - 1),
         )
+        if self.navigation.rebase(context):
+            if self.handle_key is not None:
+                self.base_delta = self.world_delta
+                self.plane_normal = context.region_data.view_rotation @ Vector((0, 0, 1))
+                self.world_start = edit_drag.project(
+                    context, pixel, self.plane_origin + self.base_delta, self.plane_normal
+                )
+            if not self.dragging:
+                self.start = self.end = pixel
+            if self.handle_key is not None or not self.dragging or not releasing:
+                if releasing:
+                    self.cleanup(context)
+                    return {"FINISHED"} if self.handle_moved else {"CANCELLED"}
+                return {"RUNNING_MODAL"}
+        else:
+            self.end = pixel
         dx, dy = self.end[0] - self.start[0], self.end[1] - self.start[1]
         self.dragging = self.dragging or dx * dx + dy * dy >= _DRAG_THRESHOLD ** 2
         context.area.tag_redraw()
@@ -231,8 +261,12 @@ class SPLINE_MAKER_OT_vertex_select(bpy.types.Operator):
             if context.edit_object != self.obj:
                 self.cancel(context)
                 return {"CANCELLED"}
-            hit = edit_drag.project(context, self.end, self.plane_origin, self.plane_normal)
-            if hit is not None:
+            hit = edit_drag.project(
+                context, self.end, self.plane_origin + self.base_delta, self.plane_normal
+            )
+            if self.world_start is None:
+                self.world_start = hit
+            elif hit is not None:
                 si, pi, coordinate, flag = self.handle_key
                 point = self.data.splines[si].bezier_points[pi]
                 if not self.handle_moved:
@@ -241,8 +275,16 @@ class SPLINE_MAKER_OT_vertex_select(bpy.types.Operator):
                             clear_selection(editable_bezier_points(context))
                         setattr(point, flag, True)
                 self.handle_moved = True
+                delta = self.base_delta + hit - self.world_start
+                if event.shift:
+                    position = self.plane_origin + delta
+                    snapped = edit_drag.snap_handle(
+                        context, position, self.handle_anchor, self.handle_directions, self.plane_normal
+                    )
+                    delta = snapped - self.plane_origin
+                self.world_delta = delta
                 edit_drag.translate_handle(point, self.handle_state, coordinate,
-                                           self.inverse @ (hit - self.world_start))
+                                           self.inverse @ delta)
                 self.data.update_tag()
             if releasing:
                 self.cleanup(context)

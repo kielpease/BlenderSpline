@@ -2,7 +2,7 @@
 
 Spline Maker targets Blender 5.2.4 LTS on Windows. The ZIP is for local testing. The manifest carries a license placeholder until the owner selects a license and updates the metadata for distribution.
 
-Current accepted build: **0.15.2**, including the XY square, Move/Rotate/Scale and Select entry fixes. The next task is SM-016; its home-session handoff is in `AGENTS.md` and its resume procedure is in `TEST_PLAN.md`. `dist/` is Git-ignored, so rebuild the ZIP after pulling source on another machine. Earlier milestone procedures record historical tests; later workflow refinements supersede their old key mappings and feature deferrals.
+Current accepted build: **0.15.2**, including the XY square, Move/Rotate/Scale and Select entry fixes. The next task is SM-016; its home-session handoff is in `AGENTS.md` and its resume procedure is in `TEST_PLAN.md`. Earlier milestone procedures record historical tests; later workflow refinements supersede their old key mappings and feature deferrals.
 
 ## Build and validate
 
@@ -17,6 +17,20 @@ New-Item -ItemType Directory -Force dist | Out-Null
 ```
 
 Blender writes the ZIP to `dist/spline_maker-0.15.2.zip` using its [extension packaging commands](https://docs.blender.org/manual/en/5.2/advanced/command_line/extension_arguments.html).
+
+## Stable local installer
+
+Keep all versioned test builds in `dist/`. Use `stable/spline_maker-stable.zip` as the single installer for the owner-approved build. Its manifest identifies the version. Both folders are Git-ignored, so a fresh checkout needs a local build of the accepted version before populating `stable/`.
+
+After the owner accepts a candidate, set `$candidate` to its exact ZIP in `dist/` and validate it before replacing the stable copy. The original versioned ZIP stays in `dist/`.
+
+```powershell
+$candidate = 'dist/spline_maker-0.15.2.zip'
+& $blender --command extension validate $candidate
+if ($LASTEXITCODE -ne 0) { throw 'Candidate validation failed' }
+New-Item -ItemType Directory -Force stable | Out-Null
+Copy-Item -LiteralPath $candidate -Destination 'stable/spline_maker-stable.zip' -Force
+```
 
 ## Background smoke test
 
@@ -287,3 +301,49 @@ The owner subsequently confirms the previously mentioned fixes work well, accept
 ZIP validation, focused control/transform checks and the complete background suite pass on Blender 5.2.4 LTS. Actual gizmo rendering, picking and drag feel remain for this viewport check.
 
 The owner subsequently confirms the 0.15.2 control works great and requests commit/push for continuing at home. This is overall viewport acceptance, not a separate per-case report.
+
+## 0.15.3 edit controls viewport check
+
+1. Install `dist/spline_maker-0.15.3.zip`. Press **6** to enter editing. Check that **1 Vertex / 2 Segment / 3 Spline / 4 All** are at the top of the panel.
+2. Select two separated vertices and press **W**. The gizmo should sit between them. Drag to move both vertices and their handles.
+3. Press **E** and choose **Group** from the Rotate dropdown. Drag an axis ring or the outer view ring. The selected anchors and handles should rotate together about their average. Undo, choose **Tangents**, and verify an equivalent drag rotates the handles about their own anchors.
+4. Press **4** to select all source splines in Edit Mode, then **Enter** to return to Object Mode. Check the same with **Numpad Enter** and the **Finish Editing** button.
+
+## 0.15.4 edit snapping viewport check
+
+1. Install `dist/spline_maker-0.15.4.zip` and enter Vertex editing on a spline with separated vertices. In Top view, select one vertex, press **W**, and drag the X arrow until its X coordinate is close to another vertex's. Hold and release **Shift** without moving the pointer. Repeat with the Y arrow or the XY pad.
+2. With a handle visible, drag its diamond near the straight line between its anchor and the next vertex on that side. Hold Shift to snap onto the line and release Shift to return to free movement. Try a curved segment and an outer handle at an open endpoint.
+3. Press **Esc** during an active drag to revert that preview. Press Esc again while idle to return to Object Mode and verify earlier completed edits are still present.
+
+## 0.15.5 compact controls and transform readouts
+
+1. Disable the previous build, restart Blender, and install `dist/spline_maker-0.15.5.zip`. Check that **Splines** appears in Add-ons and in the 3D Viewport sidebar.
+2. Enter Edit Mode and hover across the icon row. The tooltips should read **Select (Q)**, **Move (W)**, **Rotate (E)**, and **Scale (R)**. Open **Info** at the bottom to view Shift hints.
+3. Drag a rotation ring while holding **Shift**. Check 10° steps, exact 45° and 90° stops, and the angle callout near the pivot. Release Shift mid-drag to resume free rotation.
+4. Drag a scale control while holding **Shift**. Check that the callout steps through whole percentages, with **100%** at the starting size. Try the XY and uniform controls and check that Esc clears the callout and restores the original geometry.
+
+## 0.15.6 rotation, coordinates, and handle snapping
+
+1. Install `dist/spline_maker-0.15.6.zip`. Select a vertex or segment and drag a rotation ring with **E** active. The rings should stay at the pivot and the angle should appear to their side.
+2. Under **World position**, click **Y**, enter a new value, and confirm. The selected geometry should move along world Y until the displayed coordinate matches the input. Repeat with a segment or **4 All** and check Undo.
+3. Drag a handle near the anchor's local horizontal or vertical line and hold **Shift**. Repeat near an adjoining segment line. The handle should snap to the nearest eligible line and return to free movement when Shift is released.
+
+## 0.15.7 Scale and first-point grid snap
+
+1. Install `dist/spline_maker-0.15.7.zip`. Press **R** and drag a Scale control. Confirm the widgets and the side percentage stay visible. Check the center, the axis controls, and the offset XY square in a composite level.
+2. Start Draw Spline in Top view with the 3D cursor offset from a grid intersection. Hold **Shift** before placing the first point. The mint preview and committed vertex should align to the grid at the original drawing depth. Zoom in and repeat.
+3. Place another point while holding Shift and check that the 45° direction constraint takes over.
+
+## 0.15.8 Bézier handles on close
+
+1. Install `dist/spline_maker-0.15.8.zip`. Place three corners, then press on the first point and drag away. Observe the tangent guides and curves on both sides of the seam.
+2. Release to close. In Edit Mode, check that there are three vertices and that the original first vertex has two aligned handles. Repeat with a plain click to confirm the first vertex keeps its original type.
+3. Press Esc mid-drag in a separate drawing and check the preview clears without creating an object.
+
+## 0.16.0 interaction integration viewport check
+
+1. Disable the previous build, restart Blender, and install `dist/spline_maker-0.16.0.zip`.
+2. Select a Bézier curve and press **6**, then **4 All** and **W**. Begin a Move drag. Keep the primary button down and try wheel zoom and **Alt+middle-mouse** pan with Industry Compatible. In Blender's default keymap, try **middle-mouse** orbit. Release the navigation button, then continue dragging. The geometry should hold its current position while you navigate and resume from there.
+3. Release the drag and undo once. Check that the curve returns to its original position in Edit Mode. Redo should restore the completed move. Repeat with Rotate, Scale, and a Bézier handle.
+4. During a Scale drag, try **Alt+right-mouse** zoom in Industry Compatible, then plain right-click to cancel the drag. After canceling, right-click again to open the vertex menu. Try **Esc** on a separate drag, then press it again to exit Edit Mode.
+5. Zoom while dragging a selection box. Try the axis and plane controls on a rotated or scaled curve. Switch to native Select Box, then press **Q** and check that your selection carries over.

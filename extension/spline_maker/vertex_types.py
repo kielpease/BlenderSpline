@@ -72,7 +72,7 @@ def draw_vertex_types(layout):
 
 
 class VIEW3D_MT_spline_maker_vertex_types(bpy.types.Menu):
-    bl_label = "Spline Maker Vertex Types"
+    bl_label = "Splines Vertex Types"
 
     def draw(self, context):
         draw_vertex_types(self.layout)
@@ -80,7 +80,7 @@ class VIEW3D_MT_spline_maker_vertex_types(bpy.types.Menu):
 
 class SPLINE_MAKER_OT_vertex_context_menu(bpy.types.Operator):
     bl_idname = "spline_maker.vertex_context_menu"
-    bl_label = "Spline Maker Vertex Types"
+    bl_label = "Splines Vertex Types"
     bl_options = {"INTERNAL"}
 
     @classmethod

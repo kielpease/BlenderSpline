@@ -147,7 +147,7 @@ def box(data, projected, start, end, *, extend):
 
 class SPLINE_MAKER_OT_selection_level(bpy.types.Operator):
     bl_idname = "spline_maker.selection_level"
-    bl_label = "Set Spline Maker Selection Level"
+    bl_label = "Set Splines Selection Level"
     bl_description = "Choose vertices, segments, individual splines, or all source curve geometry"
     bl_options = {"INTERNAL"}
 
@@ -173,11 +173,9 @@ class SPLINE_MAKER_OT_selection_level(bpy.types.Operator):
         if old != self.target:
             if self.target == "REGION":
                 region_selection.select_regions(context.edit_object.data, set())
-            elif self.target == "WHOLE":
-                region_selection.select_whole(context.edit_object.data, True)
             elif self.target == "SEGMENT":
                 select(context.edit_object.data, set())
-            else:
+            elif self.target == "VERTEX":
                 # Retain endpoints, discard the edge-code handle selections.
                 for spline in context.edit_object.data.splines:
                     for point in spline.bezier_points:
@@ -187,14 +185,16 @@ class SPLINE_MAKER_OT_selection_level(bpy.types.Operator):
         if self.target == "REGION" and len(context.edit_object.data.splines) == 1:
             # Repeating 3 reselects the single spline after empty-space deselect.
             region_selection.select_regions(context.edit_object.data, {0})
+        elif self.target == "WHOLE":
+            region_selection.select_whole(context.edit_object.data, True)
         context.area.tag_redraw()
         return {"FINISHED"}
 
 
 class SPLINE_MAKER_OT_enter_selection_level(bpy.types.Operator):
     bl_idname = "spline_maker.enter_selection_level"
-    bl_label = "Enter Spline Maker Selection"
-    bl_description = "Choose a Spline Maker selection level directly from Bezier Curve Edit Mode"
+    bl_label = "Enter Splines Selection"
+    bl_description = "Choose a Splines selection level directly from Bézier Curve Edit Mode"
     bl_options = {"INTERNAL"}
 
     target: bpy.props.EnumProperty(items=LEVELS)
@@ -221,7 +221,7 @@ def register():
     if keyconfig is not None:
         for name, space in (("Curve", "EMPTY"), ("3D View", "VIEW_3D")):
             keymap = keyconfig.keymaps.new(name=name, space_type=space, region_type="WINDOW")
-            for key, target in (("ONE", "VERTEX"), ("TWO", "SEGMENT"), ("THREE", "REGION")):
+            for key, target in (("ONE", "VERTEX"), ("TWO", "SEGMENT"), ("THREE", "REGION"), ("FOUR", "WHOLE")):
                 item = keymap.keymap_items.new("spline_maker.enter_selection_level", key, "PRESS", head=True)
                 item.properties.target = target
                 _bindings.append((keymap, item))
