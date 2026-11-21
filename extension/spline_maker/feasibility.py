@@ -260,7 +260,7 @@ class SPLINE_MAKER_OT_finish_edit(bpy.types.Operator):
         bpy.ops.wm.tool_set_by_id(name="builtin.select_box")
         context.window_manager.spline_maker_selection_level = "VERTEX"
         context.window_manager.property_unset("spline_maker_vertex_rotation")
-        transform_gizmos.unregister()
+        transform_gizmos.clear_cache()
         context.area.tag_redraw()
         return {"FINISHED"}
 

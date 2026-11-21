@@ -3,7 +3,7 @@
 import bpy
 
 from . import drawing_probe, feasibility, ui, vertex_selection, vertex_types, tangent_drag, transform_gizmos, edit_drag
-from . import segment_selection, region_selection, display
+from . import segment_selection, region_selection, display, lifecycle
 
 
 CLASSES = (
@@ -27,19 +27,16 @@ def register():
     segment_selection.register()
     tangent_drag.register_settings()
     bpy.types.VIEW3D_MT_curve_add.append(ui.draw_curve_add_menu)
+    lifecycle.register()
 
 
 def unregister():
+    lifecycle.unregister()
     display.unregister()
-    region_selection.unregister()
-    edit_drag.unregister()
-    transform_gizmos.unregister()
-    tangent_drag.unregister()
     tangent_drag.unregister_settings()
     vertex_types.unregister()
     vertex_selection.unregister()
     segment_selection.unregister()
-    drawing_probe.stop_active()
     drawing_probe.unregister_exit_shortcut()
     bpy.types.VIEW3D_MT_curve_add.remove(ui.draw_curve_add_menu)
     feasibility.unregister_curve_shortcuts()

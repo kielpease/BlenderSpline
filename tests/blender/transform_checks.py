@@ -376,6 +376,6 @@ def run(module):
             print("SM-015 centered Segment/Spline/Whole rotate/scale, parent transforms, modal rollback and native undo/redo passed")
         finally:
             drag.unregister()
-            module.transform_gizmos.unregister()
+            module.transform_gizmos.clear_cache()
             bpy.context.window_manager.spline_maker_selection_level = "VERTEX"
             bpy.ops.object.mode_set(mode="OBJECT")

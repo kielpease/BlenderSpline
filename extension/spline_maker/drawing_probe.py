@@ -9,6 +9,7 @@ from bpy_extras import view3d_utils
 from gpu_extras.batch import batch_for_shader
 from mathutils import Vector
 
+from . import lifecycle
 from .drawing_plane import (
     DrawingPlane, DrawingSession, PointPlacement, SplinePoint, project_view_point, segment_preview,
     viewport_grid_spacing,
@@ -75,11 +76,6 @@ def commit_curve(context, session, *, closed=False, closing_tangent=None):
     return obj
 
 
-def stop_active():
-    if _active is not None:
-        _active.cleanup()
-
-
 class SPLINE_MAKER_OT_draw_spline(bpy.types.Operator):
     bl_idname = "spline_maker.draw_spline"
     bl_label = "Draw Spline"
@@ -106,7 +102,7 @@ class SPLINE_MAKER_OT_draw_spline(bpy.types.Operator):
         self.session = DrawingSession(DrawingPlane(
             context.scene.cursor.location, context.region_data.view_rotation,
         ))
-        self.target = self.context_key(context)
+        self.viewport = lifecycle.GestureViewport(context)
         self.pointer = None
         self.placement = None
         self.close_pressed = False
@@ -121,28 +117,24 @@ class SPLINE_MAKER_OT_draw_spline(bpy.types.Operator):
         _active = self
         context.window.cursor_modal_set("CROSSHAIR")
         context.window_manager.modal_handler_add(self)
+        lifecycle.watch()
         context.area.tag_redraw()
         return {"RUNNING_MODAL"}
-
-    @staticmethod
-    def context_key(context):
-        return tuple(
-            item.as_pointer() if item else None
-            for item in (context.window, context.area, context.region, context.scene)
-        )
 
     def cleanup(self):
         global _active
         if _active is self:
             _active = None
             bpy.types.SpaceView3D.draw_handler_remove(self.handler, "WINDOW")
+            self.handler = None
             self.session.cancel()
-            for window in bpy.context.window_manager.windows:
-                if window.as_pointer() == self.target[0]:
-                    window.cursor_modal_restore()
-                for area in window.screen.areas:
-                    if area.type == "VIEW_3D":
-                        area.tag_redraw()
+            self.placement = None
+            self.close_pressed = False
+            try:
+                self.viewport.window.cursor_modal_restore()
+            except ReferenceError:
+                pass
+            self.viewport.redraw()
 
     def cancel(self, context):
         self.cleanup()
@@ -187,12 +179,9 @@ class SPLINE_MAKER_OT_draw_spline(bpy.types.Operator):
             self.placement = PointPlacement(pixel, anchor, drag_origin=projected)
 
     def modal(self, context, event):
-        if (
-            _active is not self or self.context_key(context) != self.target
-            or context.mode != "OBJECT" or context.region_data is None
-        ):
+        if _active is not self or not self.viewport.matches(context):
             self.cleanup()
-            return {"CANCELLED"}
+            return {"CANCELLED", "PASS_THROUGH"}
 
         region = context.region
         pixel = (event.mouse_x - region.x, event.mouse_y - region.y)
@@ -274,10 +263,7 @@ class SPLINE_MAKER_OT_draw_spline(bpy.types.Operator):
 
     def draw_overlay(self):
         context = bpy.context
-        if (
-            _active is not self or self.context_key(context) != self.target
-            or context.region_data is None
-        ):
+        if _active is not self or not self.viewport.matches(context):
             return
         points = self.session.points
         button = button_at(self.pointer)

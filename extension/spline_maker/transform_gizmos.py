@@ -33,7 +33,8 @@ class VIEW3D_GGT_spline_maker_transform(bpy.types.GizmoGroup):
 
     @classmethod
     def poll(cls, context):
-        return active_mode(context) is not None
+        from .vertex_selection import supported_curve
+        return active_mode(context) is not None and supported_curve(context)
 
     def setup(self, context):
         self.controls = []
@@ -142,5 +143,5 @@ class VIEW3D_GGT_spline_maker_transform(bpy.types.GizmoGroup):
 CLASSES = (VIEW3D_GGT_spline_maker_transform,)
 
 
-def unregister():
+def clear_cache():
     _groups.clear()

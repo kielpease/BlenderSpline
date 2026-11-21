@@ -37,7 +37,7 @@ Issue IDs below are proposed labels, not existing GitHub issue numbers. Complete
 
 ## M3 — Transform beta
 
-- **SM-013 — Tool/level controls.** Visible Q/W/E/R, Vertex/Segment/Spline/Whole controls, and scoped entry/exit keys. 1/2/3 enter component levels in supported Curve Edit Mode; 4 exits and 6 enters editing. Done: keyboard/buttons agree, tool changes preserve selection, and Q hides the gizmo.
+- **SM-013 — Tool/level controls.** Visible Q/W/E/R and scoped entry/exit keys. In supported Curve Edit Mode, 1/2/3/4 choose Vertex, Segment, Spline, or All. 6 enters Vertex editing from Object Mode and Enter finishes editing. Tool changes preserve selection and Q hides the gizmos.
 - **SM-014 — Move.** Native or custom gizmo moves vertices with handles, individual handles, segments, individual splines, and all source splines together. Done: shared vertices transformed once; world-axis/plane deltas respect native object transforms; cancel and native Undo/Redo restore complete geometry. Whole curve Move in Edit Mode translates source geometry to stay within native Curve Edit undo; Object Mode provides native object transforms.
 - **SM-015 — Rotate and scale.** Vertex mode rotates/scales tangent handles around their anchors. Segment/Spline/Whole levels transform selected source geometry about the average of unique selected anchors, with shared endpoints once. Handles retain their direct-drag controls; handle-only selection does not create a vertex gizmo. Done: documented multi-selection/pivot behavior, cancel and native Undo/Redo match UI tests.
 - **SM-016 — Interaction integration.** Confirm cancel, undo/redo, axis constraints, navigation, and context menu around gizmos. Done: no transform jumps, swallowed navigation, or leaked keymaps.
@@ -45,15 +45,17 @@ Issue IDs below are proposed labels, not existing GitHub issue numbers. Complete
 ## M4 — First usable release
 
 - **SM-017 — Lifecycle and save/reopen.** Test multiple curve objects, scene changes, undo invalidation, tool exit, save/reopen, disable/re-enable. Done: no orphan overlays/handlers or data loss.
-- **SM-018 — Package and user guide.** Build an installable extension ZIP, version it, document known limits and test steps. Done: clean-install test passes on Blender 5.2.4 LTS, and release status accurately distinguishes tested features from plans.
+- **SM-018 — Package and user guide.** Version 0.18.0 completes the local installer and user guide. Clean installation passed on Blender 5.2.4 LTS for Windows. Public distribution awaits the owner's license decision. [User guide](USER_GUIDE.md) · [Test results](TEST_PLAN.md#sm-018-package-and-user-guide)
 
 ## M5 — Profile geometry (deferred)
 
 Live rectangular profile with Height/Width; unit-aware input; base/center/top and inside/center/outside alignment. Validate 8 ft × 1 ft walls. Keep source spline editable. Solve corner joins, miter limits, winding, curved paths, intersections, normals, materials, and save/reopen. Implement simple planar cases first; arbitrary 3D paths are a separate extension of scope.
 
-## M6 — Extended editing (deferred)
+## M6 — Extended editing
 
 Insert vertex preserving Bézier shape; delete vertex with explicit resulting topology; attach/detach splines across object transforms; weld compatible endpoints with tolerance; split/break topology. Later candidates: fillet/chamfer, outline, reverse, normalize, and advanced snapping. Each becomes a separately specified issue.
+
+**Next editing task — Insert Vertex.** Insert an editable vertex on a picked Bézier segment while preserving its shape. Cover open and closed splines, native Undo/Redo, and a visible editing action.
 
 ## Suggested GitHub labels
 
@@ -78,6 +80,7 @@ Track status as Backlog → Ready → In progress → Needs user test → Done. 
 - **0.15.2 XY scale control — Done:** owner confirms it works great and requests commit/push plus a home-session handoff. This accepts the offset XY square overall; no per-case viewport log was supplied. Prior Move/Rotate/Scale and Select entry acceptance remains in effect.
 - **0.15.8 Bézier closure — Done:** owner accepted click-drag handles on the closing vertex and requested the next step.
 - **SM-016 interaction integration — 0.16.0 candidate:** native navigation reaches active drag handlers, and transforms keep their preview while the viewport changes. The first drag after entering Edit Mode has a native Undo checkpoint. See the [viewport check](BUILD.md#0160-interaction-integration-viewport-check).
+- **SM-017 lifecycle and save/reopen — 0.17.0:** background and isolated Industry Compatible viewport checks passed on Blender 5.2.4 LTS. Committed curves survive save/reopen, and switching tools or scenes clears live previews. Disable/re-enable restores native Select Box and registers each callback once. [Viewport check](BUILD.md#0170-lifecycle-viewport-check)
 - **0.15.3 edit controls — Needs user test:** Center Vertex Move, add optional Vertex Group rotation, and put selection levels at the top with 4 All and Enter to finish. The owner reported exploratory moves across viewport orientations, vertices, segments and splines without major issues.
 - **Deferred — Make Planar:** Consider a visible action for selected geometry, individual splines, and All that flattens anchors and handles to the original drawing plane.
 

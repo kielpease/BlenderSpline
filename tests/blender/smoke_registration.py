@@ -51,6 +51,8 @@ def main(archive):
     assert_finish_edit(module)
     assert_enter_edit(module)
     assert_object_display(module)
+    from lifecycle_checks import run as check_lifecycle
+    check_lifecycle(module)
     assert bpy.ops.preferences.addon_disable(module=module_name) == {"FINISHED"}
     assert_disabled(module, menu)
     assert bpy.ops.preferences.addon_enable(module=module_name) == {"FINISHED"}
@@ -64,6 +66,7 @@ def assert_enabled(module, menu):
     assert module.__name__ in bpy.context.preferences.addons
     assert all(is_registered(cls) for cls in module.CLASSES)
     assert menu.draw._draw_funcs.count(module.ui.draw_curve_add_menu) == 1
+    assert all(handlers.count(callback) == 1 for handlers, callback in module.lifecycle._HANDLERS)
     keymaps = bpy.context.window_manager.keyconfigs.addon.keymaps
     assert bpy.context.window_manager.spline_maker_selection_level == "VERTEX"
     edit_panel = module.feasibility.VIEW3D_PT_spline_maker_probe
@@ -147,13 +150,19 @@ def assert_disabled(module, menu):
     assert module.__name__ not in bpy.context.preferences.addons
     assert not any(is_registered(cls) for cls in module.CLASSES)
     assert module.ui.draw_curve_add_menu not in menu.draw._draw_funcs
+    assert all(callback not in handlers for handlers, callback in module.lifecycle._HANDLERS)
+    assert not bpy.app.timers.is_registered(module.lifecycle.check_gestures)
+    assert not bpy.app.timers.is_registered(module.lifecycle.reset_tools)
     assert all(not hasattr(tool, "_bl_tool") for tool in module.feasibility.WORKSPACE_TOOLS)
     assert not hasattr(module.drawing_probe.SplineMakerDrawTool, "_bl_tool")
     assert module.drawing_probe._exit_binding is None
     assert not module.vertex_selection._bindings
     assert module.vertex_selection._cursor_handler is None
+    assert module.vertex_selection._handler is None
     assert not module.vertex_types._bindings
     assert module.edit_drag._active is None
+    assert module.tangent_drag._active is None
+    assert module.drawing_probe._active is None
     assert module.vertex_selection._gesture is None
     assert not module.transform_gizmos._groups
     assert not module.segment_selection._bindings
@@ -982,8 +991,8 @@ def assert_closing_spline(probe):
         region=SimpleNamespace(x=0, y=0, width=500, height=500),
     )
     operator = SimpleNamespace(
-        session=session, placement=None, close_pressed=False, target=(),
-        context_key=lambda _: (), screen_position=lambda *_: hit,
+        session=session, placement=None, close_pressed=False,
+        viewport=SimpleNamespace(matches=lambda _: True), screen_position=lambda *_: hit,
         project=lambda _, pixel: Vector(((pixel[0] - hit[0]) / 20, (pixel[1] - hit[1]) / 20, 0)),
         cleanup=session.cancel, report=lambda *_: None,
     )

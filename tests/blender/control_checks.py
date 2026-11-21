@@ -84,7 +84,7 @@ def run(module):
                 assert not bpy.ops.spline_maker.tool_shortcut.poll()
                 assert bpy.ops.spline_maker.enter_selection_level.poll()
         finally:
-            module.transform_gizmos.unregister()
+            module.transform_gizmos.clear_cache()
             bpy.context.window_manager.spline_maker_selection_level = "VERTEX"
             bpy.ops.object.mode_set(mode="OBJECT")
         bpy.ops.object.select_all(action="DESELECT")

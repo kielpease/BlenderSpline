@@ -194,7 +194,7 @@ class SPLINE_MAKER_OT_whole_selection(bpy.types.Operator):
         return {"FINISHED"}
 
 
-def unregister():
+def clear_cache():
     global _cache_key, _cache_value
     _cache_key = _cache_value = None
 

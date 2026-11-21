@@ -9,7 +9,7 @@ from bpy_extras.view3d_utils import (
 from mathutils import Vector
 
 from .feasibility import active_mode, editable_bezier_points, move_origin
-from . import edit_snapping
+from . import edit_snapping, lifecycle
 from .drag_navigation import DragNavigation
 
 _active = None
@@ -113,6 +113,9 @@ def handle_neighbor(spline, index, coordinate):
 
 def selected_anchors(context):
     from . import segment_selection
+    from .vertex_selection import supported_curve
+    if not supported_curve(context):
+        return []
     if segment_selection.level(context) == "WHOLE":
         from .region_selection import whole_selected
         data = context.edit_object.data
@@ -201,7 +204,7 @@ class SPLINE_MAKER_OT_move_drag(bpy.types.Operator):
         self.points = [(si, pi, snapshot(point))
                        for si, spline in enumerate(self.data.splines) if spline.type == "BEZIER"
                        for pi, point in enumerate(spline.bezier_points) if point.as_pointer() in selected]
-        self.region_key = tuple(x.as_pointer() for x in (context.window, context.area, context.region))
+        self.viewport = lifecycle.GestureViewport(context)
         if abs(self.obj.matrix_world.determinant()) < 1e-12:
             return {"CANCELLED"}
         self.inverse = self.obj.matrix_world.inverted().to_3x3()
@@ -230,6 +233,7 @@ class SPLINE_MAKER_OT_move_drag(bpy.types.Operator):
         self.snap_axes = tuple(edit_snapping.alignment_axes(self.axis, self.normal))
         _active = self
         context.window_manager.modal_handler_add(self)
+        lifecycle.watch()
         context.area.header_text_set(
             "Move selection: Shift to align; release to confirm; Esc/right-click to cancel"
             if self.snap_axes and self.snap_targets else "Move selection: release to confirm; Esc/right-click to cancel"
@@ -272,6 +276,8 @@ class SPLINE_MAKER_OT_move_drag(bpy.types.Operator):
 
     def finish(self, context, *, cancel):
         global _active
+        if _active is not self:
+            return {"CANCELLED"}
         if cancel:
             try:
                 for si, pi, state in self.points:
@@ -280,20 +286,16 @@ class SPLINE_MAKER_OT_move_drag(bpy.types.Operator):
             except (ReferenceError, IndexError):
                 pass
         _active = None
-        if context.area is not None:
-            context.area.header_text_set(None)
-            context.area.tag_redraw()
+        self.viewport.redraw(clear_header=True)
         return {"CANCELLED"} if cancel else {"FINISHED"}
 
     def cancel(self, context):
         self.finish(context, cancel=True)
 
     def modal(self, context, event):
-        if _active is not self:
-            return {"CANCELLED"}
-        if (context.mode != "EDIT_CURVE" or context.edit_object != self.obj
-                or tuple(x.as_pointer() for x in (context.window, context.area, context.region)) != self.region_key):
-            return self.finish(context, cancel=True)
+        if _active is not self or not self.viewport.matches(context):
+            self.finish(context, cancel=True)
+            return {"CANCELLED", "PASS_THROUGH"}
         if self.navigation.forward(event):
             return {"PASS_THROUGH"}
         if (event.type in {"ESC", "WINDOW_DEACTIVATE"} or (event.ctrl and event.type == "Z")

@@ -177,3 +177,9 @@ After three or more vertices, press within 10 screen pixels of the first vertex 
 Viewport navigation stays available during Move, Rotate, Scale, direct handle drags, and box selection. While the view changes, the active transform holds its applied preview. The next pointer update establishes a new reference for continuing the same gesture. Axis and world-plane controls keep their constraints. The view-facing rotation ring uses the view axis from the start of the drag.
 
 Primary-button release commits the transform. Esc or plain right-click during a drag restores its starting state. With editing idle, right-click opens the vertex types menu and Esc finishes editing. Entering through **1** or **6** records a native Edit Mode checkpoint so Undo of the first transform can return to the original curve in Edit Mode.
+
+## Lifecycle and file persistence: 0.17.0
+
+Unfinished drawings and edit gestures belong to the viewport, tool, scene, and object that started them. Leaving that context cancels the gesture and an edit drag restores its starting geometry. Saving, opening, Undo, Redo, and disabling also clear an active preview. A saved project keeps committed native Bézier geometry, including anchors, handles, and spline closure.
+
+When a project opens with Splines enabled, the selection level, vertex rotation mode, and overlay controls start at their session defaults. On opening a project or disabling Splines, open 3D Viewports that have a Splines tool active return to Blender's Select Box. The curves remain editable through Blender's native tools.

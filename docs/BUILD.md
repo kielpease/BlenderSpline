@@ -1,8 +1,8 @@
-# Build and test Spline Maker
+# Build and test Splines
 
-Spline Maker targets Blender 5.2.4 LTS on Windows. The ZIP is for local testing. The manifest carries a license placeholder until the owner selects a license and updates the metadata for distribution.
+Splines targets Blender 5.2.4 LTS on Windows. The ZIP is for local testing. The manifest carries a license placeholder until the owner selects a license and updates the metadata for distribution.
 
-Current accepted build: **0.15.2**, including the XY square, Move/Rotate/Scale and Select entry fixes. The next task is SM-016; its home-session handoff is in `AGENTS.md` and its resume procedure is in `TEST_PLAN.md`. Earlier milestone procedures record historical tests; later workflow refinements supersede their old key mappings and feature deferrals.
+Build **0.18.0** for the current local installer. The local stable ZIP contains the validated 0.18.0 package. Earlier procedures record the key mappings and features tested at those versions.
 
 ## Build and validate
 
@@ -13,10 +13,10 @@ $blender = 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe'
 New-Item -ItemType Directory -Force dist | Out-Null
 & $blender --command extension validate extension/spline_maker
 & $blender --command extension build --source-dir extension/spline_maker --output-dir dist
-& $blender --command extension validate dist/spline_maker-0.15.2.zip
+& $blender --command extension validate dist/spline_maker-0.18.0.zip
 ```
 
-Blender writes the ZIP to `dist/spline_maker-0.15.2.zip` using its [extension packaging commands](https://docs.blender.org/manual/en/5.2/advanced/command_line/extension_arguments.html).
+Blender writes the ZIP to `dist/spline_maker-0.18.0.zip` using its extension packaging commands. [Blender extension CLI documentation](https://docs.blender.org/manual/en/5.2/advanced/command_line/extension_arguments.html)
 
 ## Stable local installer
 
@@ -25,7 +25,7 @@ Keep all versioned test builds in `dist/`. Use `stable/spline_maker-stable.zip` 
 After the owner accepts a candidate, set `$candidate` to its exact ZIP in `dist/` and validate it before replacing the stable copy. The original versioned ZIP stays in `dist/`.
 
 ```powershell
-$candidate = 'dist/spline_maker-0.15.2.zip'
+$candidate = 'dist/spline_maker-0.18.0.zip'
 & $blender --command extension validate $candidate
 if ($LASTEXITCODE -ne 0) { throw 'Candidate validation failed' }
 New-Item -ItemType Directory -Force stable | Out-Null
@@ -41,13 +41,13 @@ $previousResources = $env:BLENDER_USER_RESOURCES
 try {
     $testProfile = Join-Path (Resolve-Path dist) ([guid]::NewGuid().ToString())
     $env:BLENDER_USER_RESOURCES = (New-Item -ItemType Directory $testProfile).FullName
-    & $blender --background --factory-startup --python-exit-code 1 --python tests/blender/smoke_registration.py -- dist/spline_maker-0.15.2.zip
+    & $blender --background --factory-startup --python-exit-code 1 --python tests/blender/smoke_registration.py -- dist/spline_maker-0.18.0.zip
 } finally {
     $env:BLENDER_USER_RESOURCES = $previousResources
 }
 ```
 
-The smoke test checks install, enable, disable, and re-enable, including menu callback count, registration cleanup, and the placeholder action's effect on scene objects. It also checks the four tool keymaps, scripted tool activation, and tangent edits on native Bézier data.
+The smoke test checks install, enable, disable, and re-enable, including menu and callback counts, registration cleanup, native curve editing, undo, and a save/reopen round trip. For a hands-on tour of the current build, follow the user guide. [Splines user guide](USER_GUIDE.md)
 
 ## SM-001 viewport check (0.1.0)
 
@@ -347,3 +347,10 @@ The owner subsequently confirms the 0.15.2 control works great and requests comm
 3. Release the drag and undo once. Check that the curve returns to its original position in Edit Mode. Redo should restore the completed move. Repeat with Rotate, Scale, and a Bézier handle.
 4. During a Scale drag, try **Alt+right-mouse** zoom in Industry Compatible, then plain right-click to cancel the drag. After canceling, right-click again to open the vertex menu. Try **Esc** on a separate drag, then press it again to exit Edit Mode.
 5. Zoom while dragging a selection box. Try the axis and plane controls on a rotated or scaled curve. Switch to native Select Box, then press **Q** and check that your selection carries over.
+
+## 0.17.0 lifecycle viewport check
+
+1. Install `dist/spline_maker-0.17.0.zip` in Blender 5.2.4 LTS. In a test project, draw an open curve and a closed loop. Edit one curve, save the project, and reopen it. Check the anchors and handles on both curves. Press **6** on either curve to resume editing.
+2. Start a drawing, place a point, then select a different toolbar tool. The drawing preview should disappear. With two scenes available, switch scenes and return to confirm each scene shows its own curves.
+3. Complete a Move and check Undo/Redo. In Object Mode, delete one test spline and undo the deletion. Check that the other spline stays in place.
+4. With a Splines tool selected, disable the extension in Preferences. The viewport should return to Blender's Select Box. Re-enable Splines, enter editing again, and check that the gizmos and sidebar appear once.

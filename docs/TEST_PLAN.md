@@ -184,6 +184,20 @@ An isolated Blender viewport test used Industry Compatible input events to check
 
 The owner [viewport check](BUILD.md#0160-interaction-integration-viewport-check) covers testing with their own curves and input devices. The viewport checks used representative controls at each level. Remaining axis and plane combinations were exercised in the background suite. Lifecycle and save/reopen belong to SM-017.
 
+## SM-017 lifecycle and save/reopen
+
+The 0.17.0 ZIP validation and background suite passed on Blender 5.2.4 LTS for Windows. The round trip saves open and closed Bézier curves across two scenes, including a completed Edit Mode move. It verifies anchors, handles, handle types, closure, object transforms, scene membership, and reset of Splines session controls. It also checks independent editing of two curves and guards for Blender's native multi-object Edit Mode.
+
+The isolated Industry Compatible viewport check installed the ZIP and used Blender mouse and keyboard events to start real drawing and Move gestures. It verified preview cleanup on tool and scene changes, saving during Move, opening during a drawing, Undo during Move, and disable/re-enable. Undo and Redo restored a committed drawing, and Undo restored a deleted curve and preserved neighboring geometry. Disable returned the viewport to Select Box and removed the owned draw, cursor, and lifecycle callbacks. Re-enable restored one copy of each lifecycle callback and Q Select worked again.
+
+The automated viewport check is `tests/blender/lifecycle_viewport.py`. Run it with `--factory-startup --enable-event-simulate --python tests/blender/lifecycle_viewport.py -- dist/spline_maker-0.17.0.zip` and a fresh `BLENDER_USER_RESOURCES` directory. It writes `lifecycle-viewport.txt` in that directory. [Hands-on check](BUILD.md#0170-lifecycle-viewport-check)
+
+## SM-018 package and user guide
+
+Version 0.18.0 packages the accepted 0.17.0 lifecycle changes. Blender 5.2.4 LTS for Windows validated the manifest and ZIP and installed the archive into two fresh profiles. The full background suite passed native drawing and editing checks, Default and Industry Compatible keymap checks, save/reopen, and registration cleanup. The isolated Industry Compatible viewport run passed drawing, Move, scene and tool changes, Undo/Redo, save/reopen, and disable/re-enable.
+
+The versioned package is `dist/spline_maker-0.18.0.zip`. The local stable ZIP is a verified copy of the versioned package. The guide covers installation, the current workflow, and known limits. Public distribution awaits a license decision. [User guide](USER_GUIDE.md) · [Build commands](BUILD.md#build-and-validate)
+
 ### 0.15.3 edit controls
 
 ZIP validation and the full background suite passed on Blender 5.2.4 LTS for Windows. Regression checks verify the averaged Vertex Move pivot and a Group rotation that moves selected anchors and handles together on a parented, nonuniformly scaled curve. An isolated Industry Compatible Blender session verified keyboard entry with 6, 4 All in Edit Mode, and exit with Enter and Numpad Enter. Physical gizmo gestures and the panel layout remain in the [viewport check](BUILD.md#0153-edit-controls-viewport-check).

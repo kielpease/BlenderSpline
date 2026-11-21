@@ -9,6 +9,7 @@ from mathutils import Matrix, Vector
 from .feasibility import active_mode, move_origin, selected_vertex_handles
 from .edit_snapping import SHIFT_KEYS
 from .drag_navigation import DragNavigation
+from . import lifecycle
 
 _active = None
 
@@ -160,6 +161,7 @@ class SPLINE_MAKER_OT_tangent_drag(bpy.types.Operator):
         center = move_origin(context)
         self.pivot = center if uses_selection_center(context, self.mode) else None
         self.key = tuple(x.as_pointer() for x in (context.window, context.area, context.region))
+        self.viewport = lifecycle.GestureViewport(context)
         self.center_world = self.obj.matrix_world @ center
         self.center = location_3d_to_region_2d(context.region, context.region_data, self.center_world)
         if self.center is None or abs(self.obj.matrix_world.determinant()) < 1e-12:
@@ -194,6 +196,7 @@ class SPLINE_MAKER_OT_tangent_drag(bpy.types.Operator):
             return {"CANCELLED"}
         _active = self
         context.window_manager.modal_handler_add(self)
+        lifecycle.watch()
         context.area.header_text_set("Rotate/scale selection: release to confirm; Esc/right-click to cancel")
         return {"RUNNING_MODAL"}
 
@@ -257,26 +260,24 @@ class SPLINE_MAKER_OT_tangent_drag(bpy.types.Operator):
 
     def finish(self, context, *, cancel):
         global _active
+        if _active is not self:
+            return {"CANCELLED"}
         if cancel:
             try:
                 restore(self.data, self.snapshot)
             except (ReferenceError, IndexError):
                 pass
         _active = None
-        if context.area is not None:
-            context.area.header_text_set(None)
-            context.area.tag_redraw()
+        self.viewport.redraw(clear_header=True)
         return {"CANCELLED"} if cancel else {"FINISHED"}
 
     def cancel(self, context):
         self.finish(context, cancel=True)
 
     def modal(self, context, event):
-        if _active is not self:
-            return {"CANCELLED"}
-        if (context.edit_object != self.obj or context.mode != "EDIT_CURVE"
-                or tuple(x.as_pointer() for x in (context.window, context.area, context.region)) != self.key):
-            return self.finish(context, cancel=True)
+        if _active is not self or not self.viewport.matches(context):
+            self.finish(context, cancel=True)
+            return {"CANCELLED", "PASS_THROUGH"}
         if self.navigation.forward(event):
             return {"PASS_THROUGH"}
         if (event.type in {"ESC", "WINDOW_DEACTIVATE"} or (event.ctrl and event.type == "Z")

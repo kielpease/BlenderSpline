@@ -34,11 +34,12 @@ For each change: summarize behavior, files changed, tests, limitations, and a sh
 
 ## Session handoff: 2026-11-21
 
-- The stable installer contains **0.15.2**. The owner accepted the **0.15.8** Bézier closure workflow and requested the next step.
+- The stable installer contains **0.18.0**, packaged from the owner-accepted **0.17.0** editing and lifecycle build.
 - Repository: `https://github.com/kielpease/BlenderSpline`, branch `main`. Inspect local changes before pulling on another machine.
-- **SM-016 interaction integration** is ready for owner testing in **0.16.0**. The versioned installer is under `dist/`. See the [viewport check](docs/BUILD.md#0160-interaction-integration-viewport-check) and the results in [TEST_PLAN.md](docs/TEST_PLAN.md).
+- **SM-016 interaction integration** was pushed to `main` in commit `0413429` with the **0.16.0** ZIP available locally under `dist/`.
 - `drag_navigation.py` forwards viewport navigation events and detects projection changes during edit gestures. Move, Rotate, Scale, and direct handles rebase their input from the applied preview. Edit entry via **1** or **6** records a native Edit Mode checkpoint for the first transform Undo.
-- **SM-017 lifecycle and save/reopen** follows acceptance of the integration candidate. Attach, welding, insert/delete, and profile geometry belong to later milestones.
+- **SM-017 lifecycle and save/reopen** passed on Blender 5.2.4 LTS for Windows. [Test results](docs/TEST_PLAN.md#sm-017-lifecycle-and-savereopen)
+- **SM-018 packaging and user guide** completes the local build. The next editing task is **Insert Vertex** with Bézier shape preservation. [User guide](docs/USER_GUIDE.md) · [Roadmap](docs/ROADMAP.md#m6--extended-editing)
 
 ### Current implementation details
 
@@ -46,6 +47,7 @@ For each change: summarize behavior, files changed, tests, limitations, and a sh
 - `segment_selection.py`: native segment identity, curve sampling, crossing-box selection and level controls. `region_selection.py`'s internal `REGION` value now means the visible **3 Spline** level; it handles open and closed paths. Keep that distinction when reading earlier Region-only planning.
 - `edit_drag.py`: Move and shared world-space ray/plane projection. `tangent_drag.py`: Vertex tangent editing and Segment/Spline/Whole geometry rotation/scaling. Shared endpoints transform once. Composite pivot is the average of unique selected anchors; Whole includes hidden points.
 - `transform_gizmos.py`: one tool-owned gizmo group. Q hides controls. Move hides its gizmo during a drag, and Rotate and Scale retain their controls and readout. The offset blue XY square scales X/Y together with world Z fixed in composite R mode. The white center scales XYZ uniformly.
+- `lifecycle.py` guards live gestures against viewport, scene, object, and tool changes. Native file and history callbacks cancel previews before Blender replaces or writes data. Disable removes owned callbacks and returns open viewports using Splines tools to native Select Box.
 - Geometry transforms remain in Curve Edit Mode with the object matrix/origin fixed. Direct object-location changes in Curve Edit Mode did not participate in native curve Undo in the installed-version probe. Use Object Mode for object transforms. Geometry transforms preserve vertex types and native Auto/Vector tangent rules.
 - Drawing Finish returns to native Select Box. `display.py` colors supported Edit curves and unselected visible Bezier objects; selected Object Mode outlines remain native. The wings checkbox controls native curve normals.
 
@@ -58,7 +60,7 @@ From the repository root, set `$blender` to the local Blender 5.2.4 executable a
 ```powershell
 New-Item -ItemType Directory -Force dist | Out-Null
 & $blender --command extension build --source-dir extension/spline_maker --output-dir dist
-& $blender --command extension validate dist/spline_maker-0.16.0.zip
+& $blender --command extension validate dist/spline_maker-0.18.0.zip
 ```
 
 Use the isolated-profile smoke-test command in `docs/BUILD.md`; it sets/restores `BLENDER_USER_RESOURCES` and installs into a fresh directory under `dist`, protecting the normal Blender profile. The entry point is `tests/blender/smoke_registration.py`, which runs the segment, region/spline, controls, Whole Move, transform and entry regression modules. Disable the previous build and restart Blender before installing a new ZIP for hands-on testing.

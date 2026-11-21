@@ -9,7 +9,7 @@ from mathutils import Vector
 
 from .drawing_probe import draw_batch
 from .feasibility import active_mode, editable_bezier_points
-from . import edit_drag, segment_selection
+from . import edit_drag, lifecycle, segment_selection
 from .edit_snapping import SHIFT_KEYS
 from .drag_navigation import DragNavigation
 
@@ -189,6 +189,7 @@ class SPLINE_MAKER_OT_vertex_select(bpy.types.Operator):
             if gizmo_highlighted(context):
                 return {"PASS_THROUGH"}
         self.key = viewport_key(context)
+        self.viewport = lifecycle.GestureViewport(context)
         self.navigation = DragNavigation(context)
         self.start = self.end = pixel
         self.extend = event.shift
@@ -196,16 +197,18 @@ class SPLINE_MAKER_OT_vertex_select(bpy.types.Operator):
         self.handle_moved = False
         _gesture = self
         context.window_manager.modal_handler_add(self)
+        lifecycle.watch()
         return {"RUNNING_MODAL"}
 
     def cleanup(self, context):
         global _gesture
         if _gesture is self:
             _gesture = None
-            if context.area is not None:
-                context.area.tag_redraw()
+            self.viewport.redraw()
 
     def cancel(self, context):
+        if _gesture is not self:
+            return
         if self.handle_moved:
             try:
                 si, pi, _, _ = self.handle_key
@@ -220,9 +223,9 @@ class SPLINE_MAKER_OT_vertex_select(bpy.types.Operator):
         self.cleanup(context)
 
     def modal(self, context, event):
-        if _gesture is not self or not selection_active(context) or viewport_key(context) != self.key:
+        if _gesture is not self or not self.viewport.matches(context) or not selection_active(context):
             self.cancel(context)
-            return {"CANCELLED"}
+            return {"CANCELLED", "PASS_THROUGH"}
         if self.navigation.forward(event):
             return {"PASS_THROUGH"}
         if (event.type in {"ESC", "WINDOW_DEACTIVATE"} or (event.ctrl and event.type == "Z")
@@ -258,9 +261,6 @@ class SPLINE_MAKER_OT_vertex_select(bpy.types.Operator):
         self.dragging = self.dragging or dx * dx + dy * dy >= _DRAG_THRESHOLD ** 2
         context.area.tag_redraw()
         if self.dragging and self.handle_key is not None:
-            if context.edit_object != self.obj:
-                self.cancel(context)
-                return {"CANCELLED"}
             hit = edit_drag.project(
                 context, self.end, self.plane_origin + self.base_delta, self.plane_normal
             )
@@ -350,7 +350,7 @@ def draw_selection():
     if all(pixel is not None for pixel in guides):
         draw_batch(shader, "LINES", guides, (0.4, 0.5, 0.55, 0.65))
     draw_batch(shader, "LINES", selected, (0.35, 0.72, 1.0, 1.0))
-    if (_gesture is not None and _gesture.key == key and _gesture.dragging
+    if (_gesture is not None and _gesture.key == key and _gesture.viewport.matches(context) and _gesture.dragging
             and _gesture.handle_key is None):
         x1, y1 = _gesture.start
         x2, y2 = _gesture.end

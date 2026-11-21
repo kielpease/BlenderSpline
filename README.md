@@ -1,50 +1,29 @@
 # Splines for Blender
 
-Splines is a Blender extension for drawing and editing native Bézier curves, inspired by the direct spline modeling workflow of 3ds Max.
+Splines is a Blender extension for drawing and editing native Bézier curves in the 3D Viewport. Draw mixed straight and curved outlines directly, then work at the vertex, segment, spline, or whole-curve level.
 
-**Status:** The stable installer contains version 0.15.2. The owner accepted the 0.15.8 Bézier closure workflow. The 0.16.0 test build integrates viewport navigation with active drags and records a native Undo checkpoint when entering Edit Mode. See `docs/BUILD.md` for the local build and viewport checks.
+**Local build 0.18.0** · Verified on Blender 5.2.4 LTS for Windows, with Default and Industry Compatible keymap coverage.
 
-Primary test target: Blender 5.2.4 LTS on Windows. Compatibility beyond that version is unverified.
+## Quick start
 
-## Goal
+1. Build `spline_maker-0.18.0.zip` from this checkout. In Blender, go to **Edit → Preferences → Get Extensions** and choose **Install from Disk** from the top-right menu. [Build instructions](docs/BUILD.md#build-and-validate)
+2. In Object Mode, choose **Add → Curve → Draw Spline** or open the **Splines** tab in the viewport sidebar with **N**. Click to place corners or drag to pull linked handles. Right-click to finish an open spline. Click the first point to close it after placing at least three vertices.
+3. Select one Bézier curve and press **6** to edit. Use **1–4** for the selection level and **Q/W/E/R** for Select, Move, Rotate, or Scale. Press **Enter** to finish editing.
 
-Draw and edit mixed straight/Bézier outlines without memorizing an add-on-specific command system. Use visible tools, contextual menus, familiar transforms, and predictable selections.
+## Features
 
-## Agreed interaction
+- View-aligned drawing at the 3D cursor's depth, with first-point grid snapping, 45° direction constraints, and click-drag Bézier closure.
+- Direct handle editing, a right-click vertex-type menu, and separate selection levels for vertices, segments, splines, and all geometry.
+- Move, Rotate, and Scale gizmos with world-axis constraints, Shift snapping, and editable world coordinates in the sidebar.
+- Native Undo/Redo for completed gestures and native Bézier geometry that remains editable after saving and reopening the project.
 
-| Input | Behavior |
-| --- | --- |
-| Add → Curve → Draw Spline | Start drawing on a plane aligned to the starting view |
-| Left click | Place corner vertex |
-| Left click and drag | Place Bézier vertex and pull its tangent handles |
-| Shift during placement | Constrain segment direction to 45-degree increments in the drawing plane |
-| Click first vertex | Close spline when enough vertices exist |
-| Click and drag from first vertex | Close the spline and set linked Bézier handles at the seam |
-| Q / W / E / R | Select / Move / Rotate / Scale |
-| 1 / 2 / 3 / 4 in Edit Mode | Vertex / Segment / Spline (auto-select a sole spline) / All source splines |
-| Enter or Finish Editing | Return to Object Mode from Spline Maker Edit |
-| 5 | Preserve the owner's native Blender mode control |
-| 1 or 6 from Object Mode / Edit Spline button | Enter Vertex editing with Q Select active for a single selected editable Bezier curve |
-| Right click while editing | Vertex types and other selection-relevant commands |
+## Compatibility and scope
 
-Shortcuts supplement visible controls. They must be scoped to Spline Maker tools and must not replace Blender's global keymap.
+Splines editing operates on one editable all-Bézier curve object at a time. That object can contain multiple splines. The custom gizmos edit the source geometry in Curve Edit Mode. Use Blender Object Mode to transform the object and its origin.
 
-Q is also an explicit Select entry from supported native Curve Edit tools. W/E/R retain their native behavior until a Spline Maker tool is active. Meshes and other unsupported contexts retain native 1/6/Q controls.
+The current package is for local testing. Public extension distribution awaits a license decision. Insert/delete, attach/detach, welding, and profile geometry are planned features.
 
-## Project files
-
-- `extension/spline_maker/`: extension manifest, registration, and viewport entry points.
-- `tests/blender/smoke_registration.py`: background installation and registration smoke test.
-- `docs/BUILD.md`: build, install, and verification instructions.
-- `docs/ROADMAP.md`: milestones, issue-sized tasks, and release gates.
-- `docs/INTERACTION_SPEC.md`: behavior contract and decisions to validate.
-- `docs/ARCHITECTURE.md`: proposed implementation and technical risks.
-- `docs/TEST_PLAN.md`: manual acceptance tests and meaningful automated checks.
-- `docs/CODEX_WORKFLOW.md`: repository setup and copy/paste development prompts.
-- `AGENTS.md`: persistent project guidance for Codex.
-
-## Release approach
-
-First prove drawing, then selection and transforms. Deliver installable test builds at each working milestone. Height/width rendering and advanced topology operations follow a usable editing release.
-
-License and final public name remain decisions for the owner. Do not distribute copied third-party code without reviewing its license. Public visibility and extension publication are separate from development.
+- [User guide](docs/USER_GUIDE.md) for controls, working examples, and known limits
+- [Build and test instructions](docs/BUILD.md) for packaging and verification
+- [Test results](docs/TEST_PLAN.md#sm-018-package-and-user-guide)
+- [Roadmap](docs/ROADMAP.md) for the upcoming editing features

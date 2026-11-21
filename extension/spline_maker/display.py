@@ -12,10 +12,11 @@ _handler = None
 
 
 def redraw(self, context):
-    for window in context.window_manager.windows:
-        for area in window.screen.areas:
-            if area.type == "VIEW_3D":
-                area.tag_redraw()
+    for manager in bpy.data.window_managers:
+        for window in manager.windows:
+            for area in window.screen.areas:
+                if area.type == "VIEW_3D":
+                    area.tag_redraw()
 
 
 def active(context):
@@ -63,7 +64,7 @@ def draw_transform_readout(context):
     from .tangent_drag import _active
     if (_active is None or context.window is None or context.area is None or context.region is None
             or tuple(item.as_pointer() for item in (context.window, context.area, context.region)) != _active.key
-            or context.region_data is None):
+            or not _active.viewport.matches(context)):
         return
     center = location_3d_to_region_2d(context.region, context.region_data, _active.center_world)
     if center is None:
@@ -127,3 +128,4 @@ def unregister():
         manager.property_unset("spline_maker_curve_color")
     del bpy.types.WindowManager.spline_maker_bright_curves
     del bpy.types.WindowManager.spline_maker_curve_color
+    redraw(None, bpy.context)
