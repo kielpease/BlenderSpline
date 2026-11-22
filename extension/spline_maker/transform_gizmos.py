@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Pease Technology
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Tool-owned Blender-style axes; one group reads the active mode every draw."""
 
 import bpy
@@ -26,7 +29,7 @@ def gizmo_highlighted(context):
 
 class VIEW3D_GGT_spline_maker_transform(bpy.types.GizmoGroup):
     bl_idname = "VIEW3D_GGT_spline_maker_transform"
-    bl_label = "Splines Transform"
+    bl_label = "Spline Transform"
     bl_space_type = "VIEW_3D"
     bl_region_type = "WINDOW"
     bl_options = {"3D", "SHOW_MODAL_ALL"}

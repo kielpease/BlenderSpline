@@ -1,8 +1,11 @@
-"""Spline Maker extension entry point."""
+# SPDX-FileCopyrightText: 2026 Pease Technology
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+"""Spline extension entry point."""
 
 import bpy
 
-from . import drawing_probe, feasibility, ui, vertex_selection, vertex_types, tangent_drag, transform_gizmos, edit_drag
+from . import drawing_probe, ui, feasibility, vertex_selection, vertex_types, tangent_drag, transform_gizmos, edit_drag
 from . import segment_selection, region_selection, display, lifecycle, insert_vertex, topology_edit, curve_connections
 from . import make_planar, profile
 

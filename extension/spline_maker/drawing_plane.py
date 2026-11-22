@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Pease Technology
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """View projection and in-progress points for the fixed drawing plane."""
 
 from dataclasses import dataclass

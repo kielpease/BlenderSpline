@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Pease Technology
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Rebase a viewport gesture when native navigation changes its projection."""
 
 _NAVIGATION = {

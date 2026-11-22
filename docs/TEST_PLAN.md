@@ -196,7 +196,7 @@ The automated viewport check is `tests/blender/lifecycle_viewport.py`. Run it wi
 
 Version 0.18.0 packages the accepted 0.17.0 lifecycle changes. Blender 5.2.4 LTS for Windows validated the manifest and ZIP and installed the archive into two fresh profiles. The full background suite passed native drawing and editing checks, Default and Industry Compatible keymap checks, save/reopen, and registration cleanup. The isolated Industry Compatible viewport run passed drawing, Move, scene and tool changes, Undo/Redo, save/reopen, and disable/re-enable.
 
-The versioned package is `dist/spline_maker-0.18.0.zip`. The guide covers installation, the current workflow, and known limits. Public distribution awaits a license decision. [User guide](USER_GUIDE.md) · [Build commands](BUILD.md#build-and-validate)
+The versioned package is `dist/spline_maker-0.18.0.zip`. This build used a local-testing license placeholder. [User guide](USER_GUIDE.md) · [Build commands](BUILD.md#build-and-validate)
 
 Version 0.18.1 sets the maintainer to Pease Technology, LLC. The local stable ZIP is a verified copy of `dist/spline_maker-0.18.1.zip`.
 
@@ -303,6 +303,12 @@ Isolated viewport checks passed on Blender 5.2.4 LTS for Windows with Industry C
 
 - Clean ZIP install, menu registration and the full background suite passed on Blender 5.2.4 LTS for Windows. The native Add → Curve menu showed the Bézier icon beside **Draw Spline** with both keymaps. Clicking the entry started drawing, placed corners and Bézier handles, closed a nine-vertex path, and supported Undo and Redo. The same path was used to verify Segment Move gizmo activation and preview a live Rectangle profile.
 - The sidebar and lifecycle viewport regressions passed. A separate profile upgraded from 0.26.3 to 0.26.4 across a Blender restart and retained exactly one **Draw Spline** callback. [Hands-on checklist](BUILD.md#0264-draw-spline-menu-icon)
+
+### 1.0.0 Spline package
+
+- Blender 5.2.4 LTS for Windows validated the final ZIP. The package includes the same GPL text as the repository and identifies Spline and Pease Technology in the manifest.
+- The background suite and viewport lifecycle checks passed. The Industry Compatible viewport recording drew and closed an outline from **Add → Curve → Draw Spline**, undid and restored it, moved a selected segment, and adjusted a Bézier handle. The renamed **Spline** tab passed the curve-to-mesh switching test with both the Default and Industry Compatible keymaps.
+- A clean profile upgraded from 0.26.4 and reopened an existing Bézier curve with its live profile dimensions intact. The upgrade kept one **Draw Spline** menu entry.
 
 ## Release gate
 

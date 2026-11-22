@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Pease Technology
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Screen-space Bézier picking backed by Blender's edit selection flags."""
 
 from dataclasses import dataclass

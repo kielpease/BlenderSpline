@@ -1,4 +1,7 @@
-"""Undoable vertex tangent types in the Spline Maker editing context."""
+# SPDX-FileCopyrightText: 2026 Pease Technology
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+"""Undoable vertex tangent types in the Spline editing context."""
 
 import bpy
 
@@ -130,7 +133,7 @@ def draw_handle_restore(layout, context):
 
 
 class VIEW3D_MT_spline_maker_vertex_types(bpy.types.Menu):
-    bl_label = "Splines Vertex Types"
+    bl_label = "Spline Vertex Types"
 
     def draw(self, context):
         draw_vertex_types(self.layout)
@@ -139,7 +142,7 @@ class VIEW3D_MT_spline_maker_vertex_types(bpy.types.Menu):
 
 class SPLINE_MAKER_OT_vertex_context_menu(bpy.types.Operator):
     bl_idname = "spline_maker.vertex_context_menu"
-    bl_label = "Splines Vertex Types"
+    bl_label = "Spline Vertex Types"
     bl_options = {"INTERNAL"}
 
     @classmethod

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Pease Technology
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Project selected Bézier control geometry onto a common plane."""
 
 from math import isfinite
@@ -10,7 +13,7 @@ from .drawing_plane import DRAWING_PLANE_KEY, DRAWING_PLANE_XY
 
 
 _PLANES = (
-    ("DRAWING", "Drawing Plane", "Use the plane recorded when the curve was drawn with Splines", 1),
+    ("DRAWING", "Drawing Plane", "Use the plane recorded when the curve was drawn with Spline", 1),
     ("VIEW", "View Plane", "Use a plane facing the current view through the selection center", 0),
 )
 _VIEW_ONLY = (_PLANES[1],)

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Pease Technology
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Attach and detach curve paths and weld selected Bézier endpoints."""
 
 import bpy

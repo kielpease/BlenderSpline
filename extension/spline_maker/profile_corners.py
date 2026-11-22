@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Pease Technology
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Geometry Nodes for mitering the evaluated rectangular sweep."""
 
 import bpy
@@ -8,7 +11,7 @@ _STRAIGHT_TOLERANCE = 1e-6
 
 
 def miter_group():
-    group = bpy.data.node_groups.new("Splines Mitered Sweep", "GeometryNodeTree")
+    group = bpy.data.node_groups.new("Spline Mitered Sweep", "GeometryNodeTree")
     for name in ("Curve", "Profile"):
         group.interface.new_socket(name=name, in_out="INPUT", socket_type="NodeSocketGeometry")
     group.interface.new_socket(name="Mesh", in_out="OUTPUT", socket_type="NodeSocketGeometry")

@@ -71,7 +71,7 @@ def check(archive, test_directory, industry):
     click(curve_point)
     yield "select the spline"
     assert context.active_object == curve
-    yield from expect_tab(sidebar, "Splines")
+    yield from expect_tab(sidebar, "Spline")
 
     send(box_point)
     yield "hover the existing box"
@@ -89,16 +89,16 @@ def check(archive, test_directory, industry):
     click(curve_point)
     yield "select the spline again"
     assert context.active_object == curve
-    yield from expect_tab(sidebar, "Splines")
+    yield from expect_tab(sidebar, "Spline")
 
     send(curve_point, "SIX")
     yield "edit the selected spline"
     assert context.mode == "EDIT_CURVE"
-    yield from expect_tab(sidebar, "Splines")
+    yield from expect_tab(sidebar, "Spline")
     send(curve_point, "RET")
     yield "finish spline editing"
     assert context.mode == "OBJECT"
-    yield from expect_tab(sidebar, "Splines")
+    yield from expect_tab(sidebar, "Spline")
 
     context.scene.cursor.location = (0, -3, 0)
     send(curve_point, "TAB" if industry else "F3")
@@ -118,7 +118,7 @@ def check(archive, test_directory, industry):
     yield "undo creation and restore the spline"
     assert context.active_object.name == "Sidebar spline"
     assert created_name not in context.scene.objects
-    yield from expect_tab(sidebar, "Splines")
+    yield from expect_tab(sidebar, "Spline")
     assert bpy.ops.ed.redo() == {"FINISHED"}
     yield "redo creation"
     assert context.active_object.name == created_name
@@ -134,7 +134,7 @@ def check(archive, test_directory, industry):
     send(curve_point, "RIGHT_BRACKET" if industry else "N", ctrl=industry)
     yield "reopen the sidebar with the current keymap"
     assert context.space_data.show_region_ui
-    yield from expect_tab(sidebar, "Splines")
+    yield from expect_tab(sidebar, "Spline")
 
 
 def main():

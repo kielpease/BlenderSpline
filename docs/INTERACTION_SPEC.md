@@ -261,3 +261,7 @@ Press **6** or click **Edit Spline** to edit the active selected Bézier curve. 
 ### Sidebar follows the active object
 
 When the 3D Viewport sidebar is open, selecting an editable Bézier curve or entering Curve Edit Mode activates **Splines**. Selecting or creating a mesh from the **Splines** tab in Object Mode activates Blender’s **Item** tab. A closed sidebar stays closed. Users can choose another tab while the active object and mode stay the same, and can still open **Splines** manually to draw.
+
+### Version 1.0 labels
+
+The extension and sidebar tab are named **Spline**. The panel in Curve Edit Mode reads **Edit Spline**. The extension ID and the workflow above carry forward from earlier builds.

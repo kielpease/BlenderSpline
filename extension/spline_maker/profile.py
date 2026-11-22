@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Pease Technology
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Live cross-sections for native Bézier curve objects."""
 
 from math import pi
@@ -7,7 +10,7 @@ import bpy
 from . import profile_corners
 
 
-_GROUP_NAME = "Splines Profile"
+_GROUP_NAME = "Spline Profile"
 _GROUP_KEY = "spline_maker_profile"
 _GROUP_VERSION = 2
 _MIN_DIMENSION = 1e-6

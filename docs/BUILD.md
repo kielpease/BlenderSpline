@@ -1,8 +1,8 @@
-# Build and test Splines
+# Build and test Spline
 
-Splines targets Blender 5.2.4 LTS on Windows. The ZIP is for local testing. The manifest carries a license placeholder until the owner selects a license and updates the metadata for distribution.
+Spline targets Blender 5.2.4 LTS on Windows. The package includes the GNU GPL license text and declares GPL-3.0-or-later.
 
-Build **0.26.4** for the Draw Spline menu icon and the latest editing and profile tools. The local stable ZIP contains **0.18.1**. Earlier procedures record the key mappings and features tested at those versions.
+Build **1.0.0** for the Spline name and current drawing, editing, and profile tools. The local stable ZIP contains **0.18.1**. Earlier procedures record the labels and key mappings used for historical checks.
 
 ## Build and validate
 
@@ -12,11 +12,11 @@ Run from the project folder in PowerShell. Set `$blender` to your installed exec
 $blender = 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe'
 New-Item -ItemType Directory -Force dist | Out-Null
 & $blender --command extension validate extension/spline_maker
-& $blender --command extension build --source-dir extension/spline_maker --output-dir dist
-& $blender --command extension validate dist/spline_maker-0.26.4.zip
+& $blender --command extension build --source-dir extension/spline_maker --output-filepath dist/spline-1.0.0.zip
+& $blender --command extension validate dist/spline-1.0.0.zip
 ```
 
-Blender writes the ZIP to `dist/spline_maker-0.26.4.zip` using its extension packaging commands. [Blender extension CLI documentation](https://docs.blender.org/manual/en/5.2/advanced/command_line/extension_arguments.html)
+Blender writes the ZIP to `dist/spline-1.0.0.zip`. The extension uses `spline_maker` internally so Blender can upgrade earlier builds in place. [Blender extension CLI documentation](https://docs.blender.org/manual/en/5.2/advanced/command_line/extension_arguments.html)
 
 ## Stable local installer
 
@@ -41,13 +41,13 @@ $previousResources = $env:BLENDER_USER_RESOURCES
 try {
     $testProfile = Join-Path (Resolve-Path dist) ([guid]::NewGuid().ToString())
     $env:BLENDER_USER_RESOURCES = (New-Item -ItemType Directory $testProfile).FullName
-    & $blender --background --factory-startup --python-exit-code 1 --python tests/blender/smoke_registration.py -- dist/spline_maker-0.26.4.zip
+    & $blender --background --factory-startup --python-exit-code 1 --python tests/blender/smoke_registration.py -- dist/spline-1.0.0.zip
 } finally {
     $env:BLENDER_USER_RESOURCES = $previousResources
 }
 ```
 
-The smoke test checks install, enable, disable, and re-enable, including menu and callback counts, registration cleanup, native curve editing, undo, and a save/reopen round trip. For a hands-on tour of the current build, follow the user guide. [Splines user guide](USER_GUIDE.md)
+The smoke test checks install, enable, disable, and re-enable, including menu and callback counts, registration cleanup, native curve editing, undo, and a save/reopen round trip. For a hands-on tour of the current build, follow the user guide. [Spline user guide](USER_GUIDE.md)
 
 ## SM-001 viewport check (0.1.0)
 
@@ -439,7 +439,7 @@ Repeat the mode-switching check with **Enter** and **Numpad Enter** while the po
 2. Select the curve and confirm the sidebar switches to **Splines**. Select the cube and confirm the sidebar switches to **Item**. Select the curve again and use Blender’s **Add Cube** command. The new cube should also show **Item**.
 3. Close the sidebar, select the curve, and reopen the sidebar. It should stay closed until reopened, then show **Splines**. With the same curve selected, you can switch tabs manually.
 
-The isolated viewport regression is `tests/blender/sidebar_viewport.py`. Launch a fresh test profile with `--enable-event-simulate --python tests/blender/sidebar_viewport.py -- dist/spline_maker-0.26.4.zip industry` or use `default` for Blender’s default keymap.
+The current isolated viewport regression is `tests/blender/sidebar_viewport.py`. Launch a fresh test profile with `--enable-event-simulate --python tests/blender/sidebar_viewport.py -- dist/spline-1.0.0.zip industry` or use `default` for Blender’s default keymap.
 
 ## 0.26.4 Draw Spline menu icon
 

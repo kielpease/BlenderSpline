@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Pease Technology
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Remove anchors or segments, and break a path at its anchors."""
 
 import bpy
@@ -254,8 +257,8 @@ class SPLINE_MAKER_OT_break_verts(bpy.types.Operator):
 
 class SPLINE_MAKER_OT_delete_selection(bpy.types.Operator):
     bl_idname = "spline_maker.delete_selection"
-    bl_label = "Delete Splines Selection"
-    bl_description = "Remove vertices or segments at the active Splines selection level"
+    bl_label = "Delete Spline Selection"
+    bl_description = "Remove vertices or segments at the active Spline selection level"
     bl_options = {"UNDO", "INTERNAL"}
 
     @classmethod

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Pease Technology
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Insert a native Bézier vertex at a picked point on a visible segment."""
 
 import bpy

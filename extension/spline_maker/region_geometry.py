@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Pease Technology
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Conservative planar-loop validation; no viewport or source data mutation."""
 
 from dataclasses import dataclass

@@ -69,7 +69,7 @@ def main(archive):
     assert_enabled(module, menu)
     assert bpy.ops.preferences.addon_disable(module=module_name) == {"FINISHED"}
     assert_disabled(module, menu)
-    print(f"Spline Maker registration smoke test passed on {bpy.app.version_string}")
+    print(f"Spline registration smoke test passed on {bpy.app.version_string}")
 
 
 def assert_enabled(module, menu):
@@ -85,7 +85,8 @@ def assert_enabled(module, menu):
     assert bpy.context.window_manager.spline_maker_selection_level == "VERTEX"
     edit_panel = module.feasibility.VIEW3D_PT_spline_maker_probe
     info_panel = module.feasibility.VIEW3D_PT_spline_maker_edit_info
-    assert edit_panel.bl_category == "Splines" and module.ui.VIEW3D_PT_spline_maker.bl_category == "Splines"
+    assert edit_panel.bl_category == "Spline" and module.ui.VIEW3D_PT_spline_maker.bl_category == "Spline"
+    assert edit_panel.bl_label == "Edit Spline" and module.ui.VIEW3D_PT_spline_maker.bl_label == "Spline"
     assert info_panel.bl_parent_id == edit_panel.__name__ and "DEFAULT_CLOSED" in info_panel.bl_options
     icons = bpy.types.UILayout.bl_rna.functions["operator"].parameters["icon"].enum_items.keys()
     from control_checks import Layout
@@ -207,7 +208,9 @@ def assert_disabled(module, menu):
     assert not bpy.app.timers.is_registered(module.ui.apply_sidebar_updates)
     assert not module.ui._sidebar_updates and not module.ui._sidebar_selection
     keymaps = bpy.context.window_manager.keyconfigs.addon.keymaps
-    assert not any("Spline Maker" in keymap.name or "Splines" in keymap.name for keymap in keymaps)
+    tool_labels = {tool.bl_label for tool in module.feasibility.WORKSPACE_TOOLS}
+    tool_labels.add(module.drawing_probe.SplineMakerDrawTool.bl_label)
+    assert not any(keymap.name.rsplit(", ", 1)[-1] in tool_labels for keymap in keymaps)
     assert not any(item.idname == "spline_maker.tool_shortcut"
                    for item in keymaps["Curve"].keymap_items)
     assert not any(item.idname == "spline_maker.tool_shortcut"

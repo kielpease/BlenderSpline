@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Pease Technology
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Tangent and selection-center transforms with one undo boundary per drag."""
 
 from math import atan2, copysign, degrees, floor, radians

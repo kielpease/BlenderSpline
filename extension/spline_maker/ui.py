@@ -1,10 +1,14 @@
-"""Splines viewport controls and selection-aware sidebar navigation."""
+# SPDX-FileCopyrightText: 2026 Pease Technology
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+"""Spline viewport controls and selection-aware sidebar navigation."""
 
 import bpy
 
 from .drawing_probe import SPLINE_MAKER_OT_draw_spline
 
 
+SIDEBAR_CATEGORY = "Spline"
 _sidebar_selection = {}
 _sidebar_updates = {}
 
@@ -40,8 +44,8 @@ def follow_active_object(context):
     from .curve_connections import editable_curve
     category = sidebar.active_panel_category
     if context.mode == "EDIT_CURVE" or editable_curve(obj):
-        target = "Splines"
-    elif category == "Splines":
+        target = SIDEBAR_CATEGORY
+    elif category == SIDEBAR_CATEGORY:
         target = "Item"
     else:
         return
@@ -71,7 +75,7 @@ def apply_sidebar_updates():
                 obj = _active_selection(context)
                 if obj is None or (context.mode, obj.as_pointer()) != signature:
                     continue
-                if target == "Item" and sidebar.active_panel_category != "Splines":
+                if target == "Item" and sidebar.active_panel_category != SIDEBAR_CATEGORY:
                     continue
                 sidebar.active_panel_category = target
                 sidebar.tag_redraw()
@@ -89,10 +93,10 @@ def reset_sidebar_following():
 
 
 class VIEW3D_PT_spline_maker(bpy.types.Panel):
-    bl_label = "Splines"
+    bl_label = "Spline"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "Splines"
+    bl_category = SIDEBAR_CATEGORY
     bl_context = "objectmode"
 
     def draw(self, context):

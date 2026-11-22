@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Pease Technology
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """A small Edit Mode probe for native picking and tool-local transforms."""
 
 from math import radians
@@ -6,6 +9,7 @@ import bpy
 from bpy_extras.object_utils import object_data_add
 from mathutils import Matrix, Vector
 
+from .ui import SIDEBAR_CATEGORY
 
 TOOLS = (
     ("Q", "SELECT", "Select"),
@@ -82,7 +86,7 @@ class SPLINE_MAKER_OT_add_test_curve(bpy.types.Operator):
         return context.mode == "OBJECT"
 
     def execute(self, context):
-        curve = bpy.data.curves.new("Spline Maker Test Curve", "CURVE")
+        curve = bpy.data.curves.new("Spline Test Curve", "CURVE")
         curve.dimensions = "3D"
         points = curve.splines.new("BEZIER").bezier_points
         points.add(1)
@@ -92,7 +96,7 @@ class SPLINE_MAKER_OT_add_test_curve(bpy.types.Operator):
             point.handle_left = (x - 0.9, y - 0.6, 0.0)
             point.handle_right = (x + 0.9, y + 0.6, 0.0)
         object_data_add(context, curve)
-        self.report({"INFO"}, "Enter Edit Mode and activate Splines Select")
+        self.report({"INFO"}, "Enter Edit Mode and activate Spline Select")
         return {"FINISHED"}
 
 
@@ -130,7 +134,7 @@ class SPLINE_MAKER_OT_tangent_step(bpy.types.Operator):
 
 class SPLINE_MAKER_OT_switch_tangent_tool(bpy.types.Operator):
     bl_idname = "spline_maker.switch_tangent_tool"
-    bl_label = "Switch Splines Tool"
+    bl_label = "Switch Spline Tool"
     bl_options = {"INTERNAL"}
 
     target: bpy.props.EnumProperty(items=(
@@ -171,7 +175,7 @@ class SPLINE_MAKER_OT_switch_tangent_tool(bpy.types.Operator):
 
 class SPLINE_MAKER_OT_tool_shortcut(bpy.types.Operator):
     bl_idname = "spline_maker.tool_shortcut"
-    bl_label = "Switch Active Splines Tool"
+    bl_label = "Switch Active Spline Tool"
     bl_options = {"INTERNAL"}
 
     target: bpy.props.EnumProperty(items=tuple((mode, label, "") for _, mode, label in TOOLS))
@@ -186,7 +190,7 @@ class SPLINE_MAKER_OT_tool_shortcut(bpy.types.Operator):
 
 class SPLINE_MAKER_OT_select_shortcut(bpy.types.Operator):
     bl_idname = "spline_maker.select_shortcut"
-    bl_label = "Activate Splines Select"
+    bl_label = "Activate Spline Select"
     bl_options = {"INTERNAL"}
 
     @classmethod
@@ -255,7 +259,7 @@ class SPLINE_MAKER_OT_enter_edit(bpy.types.Operator):
 
 class SPLINE_MAKER_OT_enter_object_edit_level(bpy.types.Operator):
     bl_idname = "spline_maker.enter_object_edit_level"
-    bl_label = "Enter Splines Editing from Object Mode"
+    bl_label = "Enter Spline Editing from Object Mode"
     bl_options = {"INTERNAL"}
 
     target: bpy.props.EnumProperty(items=LEVELS, default="VERTEX", options={"SKIP_SAVE"})
@@ -289,7 +293,7 @@ class SPLINE_MAKER_OT_finish_edit(bpy.types.Operator):
         if insert_vertex._active is not None:
             insert_vertex._active.cancel(context)
         # Reset the Edit tool too, so re-entering Edit Mode starts in Blender's
-        # normal selection context rather than the old Spline Maker tool.
+        # normal selection context rather than the old Spline tool.
         if reset_tool:
             bpy.ops.wm.tool_set_by_id(name="builtin.select_box")
         result = bpy.ops.object.mode_set(mode="OBJECT")
@@ -306,7 +310,7 @@ class SPLINE_MAKER_OT_finish_edit(bpy.types.Operator):
 
 class SPLINE_MAKER_OT_exit_edit_shortcut(bpy.types.Operator):
     bl_idname = "spline_maker.exit_edit_shortcut"
-    bl_label = "Finish Editing Splines"
+    bl_label = "Finish Spline Editing"
     bl_options = {"INTERNAL"}
 
     @classmethod
@@ -343,10 +347,10 @@ def move_origin(context):
 
 
 class VIEW3D_PT_spline_maker_probe(bpy.types.Panel):
-    bl_label = "Edit Splines"
+    bl_label = "Edit Spline"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "Splines"
+    bl_category = SIDEBAR_CATEGORY
 
     @classmethod
     def poll(cls, context):
@@ -442,7 +446,7 @@ class VIEW3D_PT_spline_maker_edit_info(bpy.types.Panel):
     bl_label = "Info"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "Splines"
+    bl_category = SIDEBAR_CATEGORY
     bl_parent_id = "VIEW3D_PT_spline_maker_probe"
     bl_options = {"DEFAULT_CLOSED"}
 
@@ -534,7 +538,7 @@ class SplineMakerSelect(bpy.types.WorkSpaceTool):
     bl_space_type = "VIEW_3D"
     bl_context_mode = "EDIT_CURVE"
     bl_idname = tool_id("SELECT")
-    bl_label = "Splines Select"
+    bl_label = "Spline Select"
     bl_icon = "ops.generic.select"
     bl_keymap = TOOL_KEYMAP
     bl_widget = "VIEW3D_GGT_spline_maker_transform"
@@ -544,7 +548,7 @@ class SplineMakerMove(bpy.types.WorkSpaceTool):
     bl_space_type = "VIEW_3D"
     bl_context_mode = "EDIT_CURVE"
     bl_idname = tool_id("MOVE")
-    bl_label = "Splines Move"
+    bl_label = "Spline Move"
     bl_icon = "ops.transform.translate"
     bl_keymap = TOOL_KEYMAP
     bl_widget = "VIEW3D_GGT_spline_maker_transform"
@@ -554,7 +558,7 @@ class SplineMakerRotate(bpy.types.WorkSpaceTool):
     bl_space_type = "VIEW_3D"
     bl_context_mode = "EDIT_CURVE"
     bl_idname = tool_id("ROTATE")
-    bl_label = "Splines Rotate"
+    bl_label = "Spline Rotate"
     bl_icon = "ops.transform.rotate"
     bl_keymap = TOOL_KEYMAP
     bl_widget = "VIEW3D_GGT_spline_maker_transform"
@@ -564,7 +568,7 @@ class SplineMakerScale(bpy.types.WorkSpaceTool):
     bl_space_type = "VIEW_3D"
     bl_context_mode = "EDIT_CURVE"
     bl_idname = tool_id("SCALE")
-    bl_label = "Splines Scale"
+    bl_label = "Spline Scale"
     bl_icon = "ops.transform.resize"
     bl_keymap = TOOL_KEYMAP
     bl_widget = "VIEW3D_GGT_spline_maker_transform"

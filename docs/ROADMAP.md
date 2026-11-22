@@ -45,7 +45,7 @@ Issue IDs below are proposed labels, not existing GitHub issue numbers. Complete
 ## M4 — First usable release
 
 - **SM-017 — Lifecycle and save/reopen.** Test multiple curve objects, scene changes, undo invalidation, tool exit, save/reopen, disable/re-enable. Done: no orphan overlays/handlers or data loss.
-- **SM-018 — Package and user guide.** Version 0.18.0 completes the local installer and user guide. Clean installation passed on Blender 5.2.4 LTS for Windows. Public distribution awaits the owner's license decision. [User guide](USER_GUIDE.md) · [Test results](TEST_PLAN.md#sm-018-package-and-user-guide)
+- **SM-018 — Package and user guide.** Version 0.18.0 completes the local installer and user guide. Clean installation passed on Blender 5.2.4 LTS for Windows. [User guide](USER_GUIDE.md) · [Test results](TEST_PLAN.md#sm-018-package-and-user-guide)
 
 ## M6 — Extended editing
 
@@ -67,11 +67,10 @@ Next are base/center/top and inside/center/outside alignment, overlap handling a
 
 ## 1.0 release preparation
 
-The 0.26.4 development build adds a Bézier icon to **Add → Curve → Draw Spline** and includes the M6 editing tools and M5 live profiles documented in the [user guide](USER_GUIDE.md).
+Version 1.0.0 brings together Bézier drawing, topology editing, and live profiles under the name **Spline**. Pease Technology licenses the extension under GPL-3.0-or-later. [User guide](USER_GUIDE.md)
 
-- Review 0.26.4 in a clean Blender profile with the Default and Industry Compatible keymaps. Use the [release gate](TEST_PLAN.md#release-gate) and [viewport checks](BUILD.md#0264-draw-spline-menu-icon).
-- Confirm the distribution license and apply it to the repository and Blender manifest.
-- Build and validate the approved 1.0 ZIP, confirm a clean install, and use that artifact for the GitHub release.
+- Build and verify `dist/spline-1.0.0.zip` in clean Blender profiles with the Default and Industry Compatible keymaps. [Release gate](TEST_PLAN.md#release-gate)
+- Review the verified ZIP in the owner’s Blender setup before publishing the GitHub release.
 
 ## Suggested GitHub labels
 

@@ -1,16 +1,17 @@
 schema_version = "1.0.0"
 id = "spline_maker"
-version = "0.26.4"
-name = "Splines"
-tagline = "Draw and edit splines in the 3D Viewport"
-maintainer = "Pease Technology, LLC"
+version = "1.0.0"
+name = "Spline"
+tagline = "Draw and edit splines with Industry Compatible controls"
+maintainer = "Pease Technology"
 type = "add-on"
 blender_version_min = "5.2.4"
-# Required by Blender for local packaging. Replace once the owner selects a license.
-license = ["License pending (local testing only)"]
+license = ["SPDX:GPL-3.0-or-later"]
+copyright = ["2026 Pease Technology"]
 
 [build]
 paths = [
+  "LICENSE",
   "__init__.py", "ui.py", "feasibility.py", "drawing_plane.py", "drawing_probe.py",
   "vertex_selection.py",
   "vertex_types.py",

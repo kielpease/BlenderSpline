@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Pease Technology
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Logical Bézier segments, adaptive screen-space picking, native selection storage."""
 
 import bpy
@@ -156,7 +159,7 @@ def box(data, projected, start, end, *, extend):
 
 class SPLINE_MAKER_OT_selection_level(bpy.types.Operator):
     bl_idname = "spline_maker.selection_level"
-    bl_label = "Set Splines Selection Level"
+    bl_label = "Set Spline Selection Level"
     bl_description = "Choose vertices, segments, individual splines, or all source curve geometry"
     bl_options = {"INTERNAL"}
 
@@ -202,8 +205,8 @@ class SPLINE_MAKER_OT_selection_level(bpy.types.Operator):
 
 class SPLINE_MAKER_OT_enter_selection_level(bpy.types.Operator):
     bl_idname = "spline_maker.enter_selection_level"
-    bl_label = "Enter Splines Selection"
-    bl_description = "Choose a Splines selection level directly from Bézier Curve Edit Mode"
+    bl_label = "Enter Spline Selection"
+    bl_description = "Choose a Spline selection level directly from Bézier Curve Edit Mode"
     bl_options = {"INTERNAL"}
 
     target: bpy.props.EnumProperty(items=LEVELS)
