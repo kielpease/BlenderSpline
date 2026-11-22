@@ -4,6 +4,7 @@ version = "1.0.0"
 name = "Spline"
 tagline = "Draw and edit splines with Industry Compatible controls"
 maintainer = "Pease Technology"
+website = "https://github.com/kielpease/BlenderSpline"
 type = "add-on"
 blender_version_min = "5.2.4"
 license = ["SPDX:GPL-3.0-or-later"]

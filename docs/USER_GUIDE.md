@@ -8,6 +8,8 @@ Build `dist/spline-1.0.0.zip` from the repository. [Build instructions](BUILD.md
 
 In Blender, open **Edit → Preferences → Get Extensions**. From the top-right menu, choose **Install from Disk** and select the ZIP. Enable **Spline** under **Add-ons** if needed. If Blender reports an already-registered class during an upgrade, restart and check the installed version under **Add-ons** before enabling it again.
 
+Expand **Spline** under **Add-ons** to find the **Website** link to the GitHub repository.
+
 ## Draw an outline
 
 1. In Object Mode, orient the viewport and put the 3D cursor at the desired drawing depth. Choose **Add → Curve → Draw Spline**, marked with a Bézier icon, or use **Draw Spline** in the **Spline** sidebar tab. Open the sidebar with **N** in the Default keymap or **Ctrl+]** in Industry Compatible. The starting view fixes the drawing plane for that spline.
