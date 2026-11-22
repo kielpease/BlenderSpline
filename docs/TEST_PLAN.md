@@ -309,6 +309,7 @@ Isolated viewport checks passed on Blender 5.2.4 LTS for Windows with Industry C
 - Blender 5.2.4 LTS for Windows validated the final ZIP. The package includes the same GPL text as the repository and identifies Spline and Pease Technology in the manifest.
 - The background suite and viewport lifecycle checks passed. The Industry Compatible viewport recording drew and closed an outline from **Add → Curve → Draw Spline**, undid and restored it, moved a selected segment, and adjusted a Bézier handle. The renamed **Spline** tab passed the curve-to-mesh switching test with both the Default and Industry Compatible keymaps.
 - A clean profile upgraded from 0.26.4 and reopened an existing Bézier curve with its live profile dimensions intact. The upgrade kept one **Draw Spline** menu entry.
+- The six feature demos were recorded in Blender 5.2.4 LTS with the Industry Compatible keymap. The viewport checks verified grouped vertex and segment moves, vertex insertion and removal, independent handle editing, Attach of 12 objects and Detach of four paths, and changing a live profile’s width and shape. The rebuilt ZIP passed package validation and the background suite. [Feature demos](../README.md#feature-demos)
 
 ## Release gate
 
