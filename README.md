@@ -4,8 +4,6 @@ Spline is a simple and classic way to draw and edit splines in Blender. Draw nat
 
 **Version 1.0.0** · By **Pease Technology** · Tested on Blender 5.2.4 LTS for Windows with the Industry Compatible and Default keymaps.
 
-[Watch the full feature walkthrough (MP4, 1:08)](docs/media/spline-feature-walkthrough.mp4)
-
 ![A Blender viewport demo showing a Bézier outline drawn from the Add menu, then edited by moving a segment and adjusting a handle](docs/images/spline-demo.gif)
 
 ## Quick start
