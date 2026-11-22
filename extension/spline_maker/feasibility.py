@@ -13,6 +13,8 @@ TOOLS = (
     ("E", "ROTATE", "Rotate"),
     ("R", "SCALE", "Scale"),
 )
+LEVELS = (("VERTEX", "Vertex", ""), ("SEGMENT", "Segment", ""),
+          ("REGION", "Spline", ""), ("WHOLE", "Whole curve", ""))
 TOOL_ICONS = {
     "SELECT": "RESTRICT_SELECT_OFF",
     "MOVE": "EMPTY_ARROWS",
@@ -30,6 +32,11 @@ def active_mode(context):
         return None
     tool = context.workspace.tools.from_space_view3d_mode("EDIT_CURVE", create=False)
     return next((mode for _, mode, _ in TOOLS if tool and tool.idname == tool_id(mode)), None)
+
+
+def is_object_mode_key(event):
+    return event.type in {"FOUR", "RET", "NUMPAD_ENTER"} and event.value == "PRESS" and not (
+        event.alt or event.ctrl or event.shift or event.oskey)
 
 
 def editable_bezier_points(context):
@@ -193,8 +200,10 @@ class SPLINE_MAKER_OT_select_shortcut(bpy.types.Operator):
 class SPLINE_MAKER_OT_enter_edit(bpy.types.Operator):
     bl_idname = "spline_maker.enter_edit"
     bl_label = "Edit Spline"
-    bl_description = "Enter Splines vertex editing for the selected Bézier curve"
+    bl_description = "Edit the active Bézier curve by itself"
     bl_options = {"INTERNAL"}
+
+    target: bpy.props.EnumProperty(items=LEVELS, default="VERTEX", options={"SKIP_SAVE"})
 
     @classmethod
     def poll(cls, context):
@@ -205,35 +214,59 @@ class SPLINE_MAKER_OT_enter_edit(bpy.types.Operator):
         obj = context.active_object
         return (context.mode == "OBJECT" and obj is not None
                 and obj.type == "CURVE" and obj.select_get()
-                and len(context.selected_objects) == 1
                 and obj.is_editable and obj.data.is_editable
                 and bool(obj.data.splines)
-                and all(s.type == "BEZIER" for s in obj.data.splines))
+                and all(s.type == "BEZIER" for s in obj.data.splines)
+                and bpy.ops.object.mode_set.poll())
 
     def execute(self, context):
-        if context.mode == "OBJECT":
+        if self.target == "REGION":
+            from .region_selection import unavailable_reason
+            reason = unavailable_reason(context.active_object.data)
+            if reason:
+                self.report({"WARNING"}, reason)
+                return {"CANCELLED"}
+        from_object = context.mode == "OBJECT"
+        other_objects = []
+        if from_object:
+            other_objects = [obj for obj in context.selected_objects if obj != context.active_object]
             # Record the native Edit Mode entry before the first spline gesture.
-            result = bpy.ops.object.mode_set("EXEC_DEFAULT", True, mode="EDIT")
+            for obj in other_objects:
+                obj.select_set(False)
+            try:
+                result = bpy.ops.object.mode_set("EXEC_DEFAULT", True, mode="EDIT")
+            except RuntimeError as exc:
+                self.report({"WARNING"}, str(exc))
+                result = {"CANCELLED"}
             if result != {"FINISHED"}:
+                for obj in other_objects:
+                    obj.select_set(True)
                 return result
             context.window_manager.property_unset("spline_maker_vertex_rotation")
         result = bpy.ops.spline_maker.switch_tangent_tool(target="SELECT")
-        if result != {"FINISHED"}:
-            return result
-        return bpy.ops.spline_maker.selection_level(target="VERTEX")
+        if result == {"FINISHED"}:
+            result = bpy.ops.spline_maker.selection_level(target=self.target)
+        if result != {"FINISHED"} and from_object:
+            bpy.ops.object.mode_set(mode="OBJECT")
+            for obj in other_objects:
+                obj.select_set(True)
+        return result
 
 
-class SPLINE_MAKER_OT_enter_vertex_edit(bpy.types.Operator):
-    bl_idname = "spline_maker.enter_vertex_edit"
-    bl_label = "Enter Splines Vertex Editing"
+class SPLINE_MAKER_OT_enter_object_edit_level(bpy.types.Operator):
+    bl_idname = "spline_maker.enter_object_edit_level"
+    bl_label = "Enter Splines Editing from Object Mode"
     bl_options = {"INTERNAL"}
+
+    target: bpy.props.EnumProperty(items=LEVELS, default="VERTEX", options={"SKIP_SAVE"})
 
     @classmethod
     def poll(cls, context):
-        return context.mode == "OBJECT" and SPLINE_MAKER_OT_enter_edit.poll(context)
+        return (context.mode == "OBJECT" and SPLINE_MAKER_OT_enter_edit.poll(context)
+                and len(context.selected_objects) == 1)
 
     def execute(self, context):
-        return bpy.ops.spline_maker.enter_edit()
+        return bpy.ops.spline_maker.enter_edit(target=self.target)
 
 
 class SPLINE_MAKER_OT_finish_edit(bpy.types.Operator):
@@ -244,20 +277,26 @@ class SPLINE_MAKER_OT_finish_edit(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return SPLINE_MAKER_OT_switch_tangent_tool.poll(context)
+        return (context.mode == "EDIT_CURVE" and context.area is not None and context.area.type == "VIEW_3D"
+                and bpy.ops.object.mode_set.poll())
 
     def execute(self, context):
-        from . import edit_drag, tangent_drag, vertex_selection, transform_gizmos
+        from . import edit_drag, insert_vertex, tangent_drag, vertex_selection, transform_gizmos
+        reset_tool = SPLINE_MAKER_OT_switch_tangent_tool.poll(context) or active_mode(context) is not None
         edit_drag.unregister()
         tangent_drag.unregister()
         vertex_selection.stop_active(context)
+        if insert_vertex._active is not None:
+            insert_vertex._active.cancel(context)
         # Reset the Edit tool too, so re-entering Edit Mode starts in Blender's
         # normal selection context rather than the old Spline Maker tool.
-        bpy.ops.wm.tool_set_by_id(name="builtin.select_box")
+        if reset_tool:
+            bpy.ops.wm.tool_set_by_id(name="builtin.select_box")
         result = bpy.ops.object.mode_set(mode="OBJECT")
         if result != {"FINISHED"}:
             return result
-        bpy.ops.wm.tool_set_by_id(name="builtin.select_box")
+        if reset_tool:
+            bpy.ops.wm.tool_set_by_id(name="builtin.select_box")
         context.window_manager.spline_maker_selection_level = "VERTEX"
         context.window_manager.property_unset("spline_maker_vertex_rotation")
         transform_gizmos.clear_cache()
@@ -272,9 +311,28 @@ class SPLINE_MAKER_OT_exit_edit_shortcut(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return SPLINE_MAKER_OT_finish_edit.poll(context) and active_mode(context) is not None
+        return SPLINE_MAKER_OT_switch_tangent_tool.poll(context) and active_mode(context) is not None
 
     def execute(self, context):
+        return bpy.ops.spline_maker.finish_edit()
+
+
+class SPLINE_MAKER_OT_object_mode_shortcut(bpy.types.Operator):
+    bl_idname = "spline_maker.object_mode_shortcut"
+    bl_label = "Return to Object Mode"
+    bl_options = {"INTERNAL"}
+
+    @classmethod
+    def poll(cls, context):
+        if context.mode == "OBJECT":
+            obj = context.active_object
+            return (context.area is not None and context.area.type == "VIEW_3D"
+                    and obj is not None and obj.type == "CURVE" and obj.select_get())
+        return SPLINE_MAKER_OT_finish_edit.poll(context)
+
+    def execute(self, context):
+        if context.mode == "OBJECT":
+            return {"FINISHED"}
         return bpy.ops.spline_maker.finish_edit()
 
 
@@ -295,38 +353,48 @@ class VIEW3D_PT_spline_maker_probe(bpy.types.Panel):
         return context.mode == "EDIT_CURVE"
 
     def draw(self, context):
+        from .display import draw_settings
+
         layout = self.layout
         # Sidebar clicks must run in the viewport's WINDOW region, just like
         # shortcuts and gizmos. Execute these discrete actions without invoking
         # an interactive transform.
         layout.operator_context = "EXEC_REGION_WIN"
-        supported = SPLINE_MAKER_OT_switch_tangent_tool.poll(context)
-        mode = active_mode(context) if supported else None
-        if supported:
-            from .segment_selection import level
-            from .region_selection import unavailable_reason, whole_selected
-            current_level = level(context)
-            row = layout.row(align=True)
-            reason = unavailable_reason(context.edit_object.data)
-            for i, (target, label) in enumerate((("VERTEX", "1  Vertex"), ("SEGMENT", "2  Segment"),
-                                                ("REGION", "3  Spline"), ("WHOLE", "4  All"))):
-                if i == 2:
-                    row = layout.row(align=True)
-                cell = row.row(align=True)
-                cell.enabled = target != "REGION" or not reason
-                cell.operator("spline_maker.enter_selection_level", text=label,
-                              depress=current_level == target).target = target
-            if reason:
-                from textwrap import wrap
-                for line in wrap("Spline: " + reason, 38):
-                    layout.label(text=line)
+        if not SPLINE_MAKER_OT_switch_tangent_tool.poll(context):
+            count = len(context.objects_in_mode)
+            message = f"{count} objects in Edit Mode" if count > 1 else "Bézier paths required"
+            layout.label(text=message, icon="INFO")
+            layout.label(text="Select one Bézier curve object.")
+            layout.operator("spline_maker.finish_edit", text="Object Mode (4 / Enter)")
+            draw_settings(layout, context)
+            return
+
+        from .segment_selection import level
+        from .region_selection import unavailable_reason, whole_selected
+        mode = active_mode(context)
+        current_level = level(context)
+        row = layout.row(align=True)
+        reason = unavailable_reason(context.edit_object.data)
+        for i, (target, label) in enumerate((("VERTEX", "1  Vertex"), ("SEGMENT", "2  Segment"),
+                                            ("REGION", "3  Spline"), ("WHOLE", "All"))):
+            if i == 2:
+                row = layout.row(align=True)
+            cell = row.row(align=True)
+            cell.enabled = target != "REGION" or not reason
+            cell.operator("spline_maker.enter_selection_level", text=label,
+                          depress=current_level == target).target = target
+        if reason:
+            from textwrap import wrap
+            for line in wrap("Spline: " + reason, 38):
+                layout.label(text=line)
         layout.separator()
         row = layout.row(align=True)
+        row.alignment = "CENTER"
         for _, target, _ in TOOLS:
             op = row.operator("spline_maker.switch_tangent_tool", text="",
                               icon=TOOL_ICONS[target], depress=mode == target)
             op.target = target
-        layout.operator("spline_maker.finish_edit", text="Finish Editing (Enter)")
+        layout.operator("spline_maker.finish_edit", text="Object Mode (4 / Enter)")
         center = move_origin(context) if mode is not None else None
         if center is not None:
             layout.label(text="World position")
@@ -336,7 +404,21 @@ class VIEW3D_PT_spline_maker_probe(bpy.types.Panel):
             for axis, coordinate in zip("XYZ", world):
                 row.operator("spline_maker.set_selection_coordinate",
                              text=f"{axis} {coordinate:.3f}").axis = axis
-        if supported and current_level == "WHOLE":
+        row = layout.row(align=True)
+        add = row.row(align=True)
+        add.operator_context = "INVOKE_REGION_WIN"
+        add.operator("spline_maker.add_vert")
+        row.operator("spline_maker.remove_vert")
+        row = layout.row(align=True)
+        row.operator("spline_maker.break_verts")
+        row.operator("spline_maker.remove_segment")
+        layout.operator("spline_maker.weld_verts")
+        if current_level == "REGION":
+            layout.operator("spline_maker.detach_splines")
+        row = layout.row()
+        row.operator_context = "INVOKE_REGION_WIN"
+        row.operator("spline_maker.make_planar")
+        if current_level == "WHOLE":
             layout.label(text="Geometry selected" if whole_selected(context.edit_object.data)
                          else "Active object; geometry unselected")
             row = layout.row(align=True)
@@ -348,11 +430,11 @@ class VIEW3D_PT_spline_maker_probe(bpy.types.Panel):
             label = "Scale Handles ×1.25" if current_level == "VERTEX" else "Scale Selection ×1.25"
             layout.operator(SPLINE_MAKER_OT_tangent_step.bl_idname, text=label)
         if mode is not None:
-            from .vertex_types import draw_vertex_types
+            from .vertex_types import draw_handle_restore, draw_vertex_types
             layout.separator()
             layout.label(text="Vertex Type (both tangents)")
             draw_vertex_types(layout)
-        from .display import draw_settings
+            draw_handle_restore(layout, context)
         draw_settings(layout, context)
 
 
@@ -420,17 +502,26 @@ def register_curve_shortcuts():
             if mode != "SELECT":
                 item.properties.target = mode
             _curve_shortcuts.append((keymap, item))
-        for key in ("ESC", "RET", "NUMPAD_ENTER"):
-            item = keymap.keymap_items.new("spline_maker.exit_edit_shortcut", key, "PRESS", head=True)
+        for key, operator in (("ESC", "spline_maker.exit_edit_shortcut"),
+                              ("RET", "spline_maker.finish_edit"),
+                              ("NUMPAD_ENTER", "spline_maker.finish_edit")):
+            item = keymap.keymap_items.new(operator, key, "PRESS", head=True)
             _curve_shortcuts.append((keymap, item))
+        item = keymap.keymap_items.new("spline_maker.delete_selection", "DEL", "PRESS", head=True)
+        _curve_shortcuts.append((keymap, item))
     for name, space_type in (("Object Non-modal", "EMPTY"), ("Object Mode", "EMPTY"),
                              ("Curve", "EMPTY"), ("3D View", "VIEW_3D")):
         keymap = keyconfig.keymaps.new(name=name, space_type=space_type, region_type="WINDOW")
+        item = keymap.keymap_items.new("spline_maker.object_mode_shortcut", "FOUR", "PRESS", head=True)
+        _curve_shortcuts.append((keymap, item))
         item = keymap.keymap_items.new("spline_maker.enter_edit", "SIX", "PRESS", head=True)
+        item.properties.target = "VERTEX"
         _curve_shortcuts.append((keymap, item))
         if name != "Curve":
-            item = keymap.keymap_items.new("spline_maker.enter_vertex_edit", "ONE", "PRESS", head=True)
-            _curve_shortcuts.append((keymap, item))
+            for key, (target, _, _) in zip(("ONE", "TWO", "THREE"), LEVELS):
+                item = keymap.keymap_items.new("spline_maker.enter_object_edit_level", key, "PRESS", head=True)
+                item.properties.target = target
+                _curve_shortcuts.append((keymap, item))
 
 
 def unregister_curve_shortcuts():
@@ -486,9 +577,10 @@ CLASSES = (
     SPLINE_MAKER_OT_tool_shortcut,
     SPLINE_MAKER_OT_select_shortcut,
     SPLINE_MAKER_OT_enter_edit,
-    SPLINE_MAKER_OT_enter_vertex_edit,
+    SPLINE_MAKER_OT_enter_object_edit_level,
     SPLINE_MAKER_OT_finish_edit,
     SPLINE_MAKER_OT_exit_edit_shortcut,
+    SPLINE_MAKER_OT_object_mode_shortcut,
     VIEW3D_PT_spline_maker_probe,
     VIEW3D_PT_spline_maker_edit_info,
 )

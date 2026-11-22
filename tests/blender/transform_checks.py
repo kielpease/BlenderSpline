@@ -135,6 +135,8 @@ def run(module):
             pivot = (before[(0, 0)][0] + before[(0, 2)][0]) / 2
             assert (module.feasibility.move_origin(fake) - pivot).length < 1e-6
             assert_coordinate_edit(before, selected, pivot)
+            assert drag.uses_selection_center(fake, "ROTATE")
+            fake.window_manager.spline_maker_vertex_rotation = "TANGENTS"
             assert not drag.uses_selection_center(fake, "ROTATE")
             fake.window_manager.spline_maker_vertex_rotation = "GROUP"
             assert not drag.uses_selection_center(fake, "SCALE")

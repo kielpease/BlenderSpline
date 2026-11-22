@@ -8,11 +8,13 @@ from bpy_extras.view3d_utils import (
 )
 from mathutils import Vector
 
-from .feasibility import active_mode, editable_bezier_points, move_origin
+from .feasibility import active_mode, editable_bezier_points, is_object_mode_key, move_origin
 from . import edit_snapping, lifecycle
 from .drag_navigation import DragNavigation
 
 _active = None
+_COORDINATE_AXES = tuple((axis, axis, "") for axis in "XYZ")
+_FLOAT_MAX = 3.4028234663852886e38
 
 
 def project(context, pixel, origin, normal):
@@ -103,12 +105,32 @@ def snap_handle(context, position, anchor, directions, view_normal):
     return best
 
 
-def handle_neighbor(spline, index, coordinate):
-    points = spline.bezier_points
+def handle_neighbor_index(spline, index, coordinate):
+    count = len(spline.bezier_points)
     neighbor = index + (-1 if coordinate == "handle_left" else 1)
-    if len(points) < 2 or (not spline.use_cyclic_u and not 0 <= neighbor < len(points)):
+    if count < 2 or (not spline.use_cyclic_u and not 0 <= neighbor < count):
         return None
-    return points[neighbor % len(points)].co.copy()
+    return neighbor % count
+
+
+def handle_neighbor(spline, index, coordinate):
+    neighbor = handle_neighbor_index(spline, index, coordinate)
+    return spline.bezier_points[neighbor].co.copy() if neighbor is not None else None
+
+
+def handle_collapsed(point, coordinate):
+    return point.co == getattr(point, coordinate)
+
+
+def set_independent_handle(point, state, coordinate, position):
+    anchor, left, right, lt, rt = state
+    if coordinate == "handle_left":
+        left, lt = position, "FREE"
+        rt = "FREE" if rt in {"ALIGNED", "AUTO"} else rt
+    else:
+        right, rt = position, "FREE"
+        lt = "FREE" if lt in {"ALIGNED", "AUTO"} else lt
+    restore(point, (anchor, left, right, lt, rt))
 
 
 def selected_anchors(context):
@@ -138,16 +160,17 @@ class SPLINE_MAKER_OT_set_selection_coordinate(bpy.types.Operator):
     bl_description = "Set a world coordinate for the selection center"
     bl_options = {"INTERNAL", "UNDO"}
 
-    axis: bpy.props.EnumProperty(items=tuple((axis, axis, "") for axis in "XYZ"))
+    axis: bpy.props.EnumProperty(items=_COORDINATE_AXES)
     value: bpy.props.FloatProperty(name="Coordinate", precision=6)
+    paste: bpy.props.BoolProperty(options={"HIDDEN", "SKIP_SAVE"})
 
     @classmethod
     def poll(cls, context):
-        from . import tangent_drag, vertex_selection
+        from . import vertex_selection
         return (
             context.area is not None and context.area.type == "VIEW_3D"
             and active_mode(context) is not None and vertex_selection.supported_curve(context)
-            and _active is None and tangent_drag._active is None and vertex_selection._gesture is None
+            and not any(lifecycle.active_gestures())
             and bool(selected_anchors(context))
         )
 
@@ -162,23 +185,65 @@ class SPLINE_MAKER_OT_set_selection_coordinate(bpy.types.Operator):
     def execute(self, context):
         obj = context.edit_object
         world = obj.matrix_world
-        if not isfinite(self.value) or abs(world.determinant()) < 1e-12:
+        value = self.value
+        if self.paste:
+            try:
+                value = float(context.window_manager.clipboard.strip())
+            except ValueError:
+                self.report({"WARNING"}, "Clipboard must contain a single number")
+                return {"CANCELLED"}
+        if not isfinite(value) or abs(value) > _FLOAT_MAX or abs(world.determinant()) < 1e-12:
             self.report({"WARNING"}, "Enter a finite coordinate on a curve with nonzero scale")
             return {"CANCELLED"}
         points = selected_anchors(context)
         center = world @ (sum((point.co for point in points), Vector()) / len(points))
         index = "XYZ".index(self.axis)
         world_delta = Vector((0, 0, 0))
-        world_delta[index] = self.value - center[index]
+        world_delta[index] = value - center[index]
         if abs(world_delta[index]) < 1e-7:
             return {"CANCELLED"}
         local_delta = world.inverted().to_3x3() @ world_delta
         states = [(point, snapshot(point)) for point in points]
+        if not all(isfinite(component) for _, state in states for coordinate in state[:3]
+                   for component in coordinate + local_delta):
+            self.report({"WARNING"}, "The resulting curve coordinates are out of range")
+            return {"CANCELLED"}
         for point, state in states:
             translate_anchor(point, state, local_delta)
         obj.data.update_tag()
         context.area.tag_redraw()
         return {"FINISHED"}
+
+
+class SPLINE_MAKER_OT_copy_selection_coordinate(bpy.types.Operator):
+    bl_idname = "spline_maker.copy_selection_coordinate"
+    bl_label = "Copy Selection Coordinate"
+    bl_description = "Copy this world coordinate of the selection center"
+    bl_options = {"INTERNAL"}
+
+    axis: bpy.props.EnumProperty(items=_COORDINATE_AXES)
+
+    @classmethod
+    def poll(cls, context):
+        return SPLINE_MAKER_OT_set_selection_coordinate.poll(context)
+
+    def execute(self, context):
+        center = context.edit_object.matrix_world @ move_origin(context)
+        context.window_manager.clipboard = format(center["XYZ".index(self.axis)], ".9g")
+        return {"FINISHED"}
+
+
+def draw_coordinate_context_menu(self, context):
+    button = getattr(context, "button_operator", None)
+    if button is None or button.bl_rna.identifier != SPLINE_MAKER_OT_set_selection_coordinate.__name__:
+        return
+    layout = self.layout
+    layout.separator()
+    layout.operator_context = "EXEC_REGION_WIN"
+    layout.operator(SPLINE_MAKER_OT_copy_selection_coordinate.bl_idname, text="Copy Value").axis = button.axis
+    paste = layout.operator(SPLINE_MAKER_OT_set_selection_coordinate.bl_idname, text="Paste Value")
+    paste.axis = button.axis
+    paste.paste = True
 
 
 class SPLINE_MAKER_OT_move_drag(bpy.types.Operator):
@@ -195,7 +260,7 @@ class SPLINE_MAKER_OT_move_drag(bpy.types.Operator):
     def poll(cls, context):
         return (context.area is not None and context.area.type == "VIEW_3D"
                 and context.region_data is not None and active_mode(context) == "MOVE"
-                and _active is None and bool(selected_anchors(context)))
+                and not any(lifecycle.active_gestures()) and bool(selected_anchors(context)))
 
     def invoke(self, context, event):
         global _active
@@ -296,7 +361,7 @@ class SPLINE_MAKER_OT_move_drag(bpy.types.Operator):
         if _active is not self or not self.viewport.matches(context):
             self.finish(context, cancel=True)
             return {"CANCELLED", "PASS_THROUGH"}
-        if self.navigation.forward(event):
+        if is_object_mode_key(event) or self.navigation.forward(event):
             return {"PASS_THROUGH"}
         if (event.type in {"ESC", "WINDOW_DEACTIVATE"} or (event.ctrl and event.type == "Z")
                 or (event.type == "RIGHTMOUSE" and event.value == "PRESS")):
@@ -314,4 +379,5 @@ def unregister():
         _active.finish(bpy.context, cancel=True)
 
 
-CLASSES = (SPLINE_MAKER_OT_move_drag, SPLINE_MAKER_OT_set_selection_coordinate)
+CLASSES = (SPLINE_MAKER_OT_move_drag, SPLINE_MAKER_OT_set_selection_coordinate,
+           SPLINE_MAKER_OT_copy_selection_coordinate)

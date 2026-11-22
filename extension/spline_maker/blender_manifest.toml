@@ -1,6 +1,6 @@
 schema_version = "1.0.0"
 id = "spline_maker"
-version = "0.18.1"
+version = "0.26.4"
 name = "Splines"
 tagline = "Draw and edit splines in the 3D Viewport"
 maintainer = "Pease Technology, LLC"
@@ -21,6 +21,12 @@ paths = [
   "lifecycle.py",
   "edit_snapping.py",
   "segment_selection.py",
+  "insert_vertex.py",
+  "topology_edit.py",
+  "curve_connections.py",
+  "make_planar.py",
+  "profile.py",
+  "profile_corners.py",
   "region_geometry.py", "region_selection.py",
   "display.py",
 ]

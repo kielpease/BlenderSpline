@@ -115,6 +115,7 @@ class Layout:
 
     def __init__(self):
         self.operators = []
+        self.labels = []
 
     def row(self, **kwargs):
         return self
@@ -125,7 +126,7 @@ class Layout:
         return op
 
     def label(self, **kwargs):
-        pass
+        self.labels.append(kwargs["text"])
 
     def separator(self):
         pass

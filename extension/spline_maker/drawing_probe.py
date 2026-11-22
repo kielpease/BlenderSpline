@@ -11,8 +11,8 @@ from mathutils import Vector
 
 from . import lifecycle
 from .drawing_plane import (
-    DrawingPlane, DrawingSession, PointPlacement, SplinePoint, project_view_point, segment_preview,
-    viewport_grid_spacing,
+    DRAWING_PLANE_KEY, DRAWING_PLANE_XY, DrawingPlane, DrawingSession, PointPlacement, SplinePoint,
+    project_view_point, segment_preview, viewport_grid_spacing,
 )
 
 
@@ -49,6 +49,7 @@ def commit_curve(context, session, *, closed=False, closing_tangent=None):
                           for axis in range(3)))
     curve = bpy.data.curves.new("Spline", "CURVE")
     curve.dimensions = "3D"
+    curve[DRAWING_PLANE_KEY] = DRAWING_PLANE_XY
     spline = curve.splines.new("BEZIER")
     spline.bezier_points.add(len(points) - 1)
     for index, (point, placed) in enumerate(zip(spline.bezier_points, points)):

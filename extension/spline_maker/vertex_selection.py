@@ -21,6 +21,7 @@ _COMPONENTS = (
 )
 _PICK_RADIUS = 9
 _DRAG_THRESHOLD = 5
+_HANDLE_COLLAPSE_RADIUS = 6
 _gesture = None
 _handler = None
 _cursor_handler = None
@@ -61,13 +62,20 @@ def selection_active(context):
     )
 
 
-def project_components(points, matrix_world, project, handle_display):
-    for point in points:
+def project_components(spline, matrix_world, project, handle_display):
+    for index, point in enumerate(spline.bezier_points):
+        if point.hide:
+            continue
         handles_visible = handle_display == "ALL" or (
             handle_display == "SELECTED" and any(getattr(point, attr) for _, attr in _COMPONENTS)
         )
         for coord, attr in _COMPONENTS:
-            if coord != "co" and not handles_visible:
+            if coord != "co" and (
+                not handles_visible
+                or edit_drag.handle_neighbor_index(spline, index, coord) is None
+                or getattr(point, f"{coord}_type") == "VECTOR"
+                or edit_drag.handle_collapsed(point, coord)
+            ):
                 continue
             pixel = project(matrix_world @ getattr(point, coord))
             if pixel is not None:
@@ -75,11 +83,13 @@ def project_components(points, matrix_world, project, handle_display):
 
 
 def viewport_components(context):
-    return project_components(
-        editable_bezier_points(context), context.edit_object.matrix_world,
-        lambda world: location_3d_to_region_2d(context.region, context.region_data, world),
-        "ALL",  # Direct manipulation diamonds remain available in every tool.
-    )
+    obj = context.edit_object
+    for spline in obj.data.splines:
+        yield from project_components(
+            spline, obj.matrix_world,
+            lambda world: location_3d_to_region_2d(context.region, context.region_data, world),
+            "ALL",
+        )
 
 
 def pick_component(components, pixel):
@@ -136,6 +146,24 @@ def pointer_in_viewport(context, window_pixel):
     return x, y
 
 
+def can_collapse_handle(context, position, anchor):
+    pixel = location_3d_to_region_2d(context.region, context.region_data, position)
+    anchor_pixel = location_3d_to_region_2d(context.region, context.region_data, anchor)
+    return (pixel is not None and anchor_pixel is not None
+            and (pixel - anchor_pixel).length_squared <= _HANDLE_COLLAPSE_RADIUS ** 2)
+
+
+def finish_handle(gesture, context):
+    if gesture.handle_collapsing and not segment_selection.composite(context):
+        si, pi, _, flag = gesture.handle_key
+        point = gesture.data.splines[si].bezier_points[pi]
+        setattr(point, flag, False)
+        point.select_control_point = True
+        gesture.data.update_tag()
+    gesture.cleanup(context)
+    return {"FINISHED"} if gesture.handle_moved else {"CANCELLED"}
+
+
 class SPLINE_MAKER_OT_vertex_select(bpy.types.Operator):
     bl_idname = "spline_maker.vertex_select"
     bl_label = "Select Spline Vertices"
@@ -143,7 +171,7 @@ class SPLINE_MAKER_OT_vertex_select(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return selection_active(context) and _gesture is None and edit_drag._active is None
+        return selection_active(context) and not any(lifecycle.active_gestures())
 
     def invoke(self, context, event):
         global _gesture
@@ -195,6 +223,7 @@ class SPLINE_MAKER_OT_vertex_select(bpy.types.Operator):
         self.extend = event.shift
         self.dragging = False
         self.handle_moved = False
+        self.handle_collapsing = False
         _gesture = self
         context.window_manager.modal_handler_add(self)
         lifecycle.watch()
@@ -252,8 +281,10 @@ class SPLINE_MAKER_OT_vertex_select(bpy.types.Operator):
                 self.start = self.end = pixel
             if self.handle_key is not None or not self.dragging or not releasing:
                 if releasing:
+                    if self.handle_key is not None:
+                        return finish_handle(self, context)
                     self.cleanup(context)
-                    return {"FINISHED"} if self.handle_moved else {"CANCELLED"}
+                    return {"CANCELLED"}
                 return {"RUNNING_MODAL"}
         else:
             self.end = pixel
@@ -276,19 +307,22 @@ class SPLINE_MAKER_OT_vertex_select(bpy.types.Operator):
                         setattr(point, flag, True)
                 self.handle_moved = True
                 delta = self.base_delta + hit - self.world_start
-                if event.shift:
-                    position = self.plane_origin + delta
-                    snapped = edit_drag.snap_handle(
-                        context, position, self.handle_anchor, self.handle_directions, self.plane_normal
-                    )
-                    delta = snapped - self.plane_origin
-                self.world_delta = delta
-                edit_drag.translate_handle(point, self.handle_state, coordinate,
-                                           self.inverse @ delta)
+                position = self.plane_origin + delta
+                self.handle_collapsing = can_collapse_handle(context, position, self.handle_anchor)
+                if self.handle_collapsing:
+                    self.world_delta = self.handle_anchor - self.plane_origin
+                    edit_drag.set_independent_handle(point, self.handle_state, coordinate, self.handle_state[0])
+                else:
+                    if event.shift:
+                        delta = edit_drag.snap_handle(
+                            context, position, self.handle_anchor, self.handle_directions, self.plane_normal
+                        ) - self.plane_origin
+                    self.world_delta = delta
+                    edit_drag.translate_handle(point, self.handle_state, coordinate,
+                                               self.inverse @ self.world_delta)
                 self.data.update_tag()
             if releasing:
-                self.cleanup(context)
-                return {"FINISHED"}
+                return finish_handle(self, context)
             return {"RUNNING_MODAL"}
         if not releasing:
             return {"RUNNING_MODAL"}
@@ -350,6 +384,13 @@ def draw_selection():
     if all(pixel is not None for pixel in guides):
         draw_batch(shader, "LINES", guides, (0.4, 0.5, 0.55, 0.65))
     draw_batch(shader, "LINES", selected, (0.35, 0.72, 1.0, 1.0))
+    if (_gesture is not None and _gesture.key == key and _gesture.handle_collapsing
+            and _gesture.viewport.matches(context)):
+        pixel = location_3d_to_region_2d(context.region, context.region_data, _gesture.handle_anchor)
+        if pixel is not None:
+            x, y = pixel
+            corners = ((x - 10, y), (x, y + 10), (x + 10, y), (x, y - 10), (x - 10, y))
+            draw_batch(shader, "LINE_STRIP", corners, (0.45, 1.0, 0.78, 1.0))
     if (_gesture is not None and _gesture.key == key and _gesture.viewport.matches(context) and _gesture.dragging
             and _gesture.handle_key is None):
         x1, y1 = _gesture.start

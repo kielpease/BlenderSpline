@@ -2,6 +2,7 @@
 
 import bpy
 
+from . import edit_drag, lifecycle, segment_selection
 from .feasibility import active_mode, editable_bezier_points
 from .vertex_selection import supported_curve
 
@@ -66,9 +67,66 @@ class SPLINE_MAKER_OT_vertex_type(bpy.types.Operator):
         return result
 
 
+def restorable_handles(context):
+    if not editing_active(context) or segment_selection.level(context) != "VERTEX":
+        return
+    for spline in context.edit_object.data.splines:
+        for index, point in enumerate(spline.bezier_points):
+            if point.hide or not point.select_control_point:
+                continue
+            for side, opposite in (("left", "right"), ("right", "left")):
+                coordinate = f"handle_{side}"
+                if (getattr(point, f"{coordinate}_type") not in {"FREE", "ALIGNED"}
+                        or not edit_drag.handle_collapsed(point, coordinate)):
+                    continue
+                neighbor = edit_drag.handle_neighbor(spline, index, coordinate)
+                if neighbor is None:
+                    continue
+                offset = (neighbor - point.co) / 3
+                if not offset.length_squared:
+                    offset = point.co - getattr(point, f"handle_{opposite}")
+                position = point.co + offset
+                if position != point.co:
+                    yield point, side, position
+
+
+class SPLINE_MAKER_OT_restore_handle(bpy.types.Operator):
+    bl_idname = "spline_maker.restore_handle"
+    bl_label = "Restore Handle"
+    bl_description = "Restore a collapsed handle on a connected side of the selected vertex"
+    bl_options = {"UNDO", "INTERNAL"}
+
+    side: bpy.props.EnumProperty(items=(("left", "Left", ""), ("right", "Right", "")))
+
+    @classmethod
+    def poll(cls, context):
+        return not any(lifecycle.active_gestures()) and next(restorable_handles(context), None) is not None
+
+    def execute(self, context):
+        restored = False
+        for point, side, position in restorable_handles(context):
+            if side == self.side:
+                edit_drag.set_independent_handle(point, edit_drag.snapshot(point), f"handle_{side}", position)
+                restored = True
+        if not restored:
+            return {"CANCELLED"}
+        context.edit_object.data.update_tag()
+        context.area.tag_redraw()
+        return {"FINISHED"}
+
+
 def draw_vertex_types(layout):
     for identifier, label, _, _ in VERTEX_TYPES:
         layout.operator(SPLINE_MAKER_OT_vertex_type.bl_idname, text=label).vertex_type = identifier
+
+
+def draw_handle_restore(layout, context):
+    sides = {side for _, side, _ in restorable_handles(context)}
+    if sides:
+        layout.separator()
+        for side in sorted(sides):
+            layout.operator(SPLINE_MAKER_OT_restore_handle.bl_idname,
+                            text=f"Restore {side.title()} Handle").side = side
 
 
 class VIEW3D_MT_spline_maker_vertex_types(bpy.types.Menu):
@@ -76,6 +134,7 @@ class VIEW3D_MT_spline_maker_vertex_types(bpy.types.Menu):
 
     def draw(self, context):
         draw_vertex_types(self.layout)
+        draw_handle_restore(self.layout, context)
 
 
 class SPLINE_MAKER_OT_vertex_context_menu(bpy.types.Operator):
@@ -107,5 +166,5 @@ def unregister():
     _bindings.clear()
 
 
-CLASSES = (SPLINE_MAKER_OT_vertex_type, VIEW3D_MT_spline_maker_vertex_types,
+CLASSES = (SPLINE_MAKER_OT_vertex_type, SPLINE_MAKER_OT_restore_handle, VIEW3D_MT_spline_maker_vertex_types,
            SPLINE_MAKER_OT_vertex_context_menu)

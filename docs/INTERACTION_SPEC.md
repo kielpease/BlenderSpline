@@ -183,3 +183,81 @@ Primary-button release commits the transform. Esc or plain right-click during a 
 Unfinished drawings and edit gestures belong to the viewport, tool, scene, and object that started them. Leaving that context cancels the gesture and an edit drag restores its starting geometry. Saving, opening, Undo, Redo, and disabling also clear an active preview. A saved project keeps committed native Bézier geometry, including anchors, handles, and spline closure.
 
 When a project opens with Splines enabled, the selection level, vertex rotation mode, and overlay controls start at their session defaults. On opening a project or disabling Splines, open 3D Viewports that have a Splines tool active return to Blender's Select Box. The curves remain editable through Blender's native tools.
+
+## M6 menu controls and Add Vert: 0.19.0
+
+The Q/W/E/R icon row is centered. Vertex Rotate starts in Group mode with Tangents available in its dropdown. Right-clicking a world-position value offers **Copy Value** and **Paste Value** for that axis. Paste translates the selection center from a single numeric clipboard value in one Undo step.
+
+Click **Add Vert** below the world coordinates, then pick a visible Bézier segment. The preview marks the insertion point on the curve. Click to split the segment at that point, keep its shape, and select the new vertex at Vertex level. Esc or right-click cancels. This works on open and closed paths. Automatic or vector handles at the adjacent endpoints can become manual where needed to preserve the shape. Add Vert requires a curve without shape keys.
+
+## M6 Remove and Break: 0.20.0
+
+In **1 Vertex**, **Remove Vert** deletes the selected anchors and reconnects the remaining vertices. **Break Verts** duplicates each selected interior vertex into coincident endpoints. On a closed path, breaking one vertex opens the loop at that vertex. Open endpoints are already boundaries.
+
+In **2 Segment**, **Remove Segment** removes the selected spans and keeps their endpoint vertices. It splits an open path where needed or opens a loop. Breaking and removing segments keep the control polygons of surviving spans. Automatic handles at a new boundary may become manual to preserve the curve's shape.
+
+**Delete** runs the matching removal in Vertex or Segment mode while a Splines tool is active. Each completed operation takes one native Undo step. These topology edits require a curve without shape keys. Remove Segment and Break Verts also require curve data without animation or Hook modifiers.
+
+## M6 handle display and collapse: 0.20.1
+
+Splines tools show diamonds for connected, nonzero handles with a manual or automatic smooth tangent. Vector handles and the unused side of open endpoints stay hidden. This applies to endpoints created by Remove Segment or Break Verts. The underlying handles remain part of the native Bézier data. An isolated vertex shows just its anchor. Blender's native handle display setting returns when leaving Splines tools.
+
+Dragging a handle within six screen pixels of its anchor previews a collapse with a mint diamond. Releasing sets the dragged handle to zero length and leaves the opposite handle at its original position. Linked tangents become independent. Escape or right-click cancels the preview. Collapse takes one Undo step.
+
+In Vertex mode, the selected anchor's right-click menu and sidebar offer **Restore Left Handle** or **Restore Right Handle** for an eligible collapsed side. Restoring extends that handle one-third of the way toward the connected neighbor in one Undo step. Where the anchors coincide, the restored handle can point away from the opposite handle at the same length.
+
+## M6 Attach and Weld: 0.21.0
+
+In Object Mode, select two Bézier curve objects, with the destination active, and click **Attach Curves** in the Splines sidebar. The paths keep their world-space control geometry and stay separate inside the active object. **3 Spline** selects an individual path and **4 All** selects the combined geometry. The active object retains its origin, transform, and curve settings. A 2D destination becomes 3D if the incoming path lies outside its plane. Automatic handles can become manual when needed to preserve shape.
+
+In **1 Vertex**, select two endpoints on open paths in the active curve object and click **Weld Verts**. The merged vertex moves to the midpoint and keeps the incoming and outgoing tangent offsets as independent handles. Welding the endpoints of one path closes it when it has at least three vertices before welding. When joining two paths with different spline settings, the resulting path uses those of the first spline in the object.
+
+Attach and Weld each take one native Undo step. Attach requires curves without shape keys and a source object without children, modifiers, or animation. Weld shares the topology rebuild limits for shape keys, curve-data animation, and Hook modifiers.
+
+## M6 Make Planar and batch Attach
+
+In Edit Mode, select vertices, segments, or paths, or use **4 All**. Click **Make Planar** beneath the topology buttons and choose a plane. The operation projects each selected anchor and both handles orthogonally in world space. A segment selection projects its endpoints and their handles once each. **4 All** includes edit-hidden vertices. Automatic and Vector handles keep their type when Blender can reproduce the projected position. They become manual when needed to hold that position. Automatic handles on unselected neighbors can update as their neighbors move.
+
+**Drawing Plane** defaults to the recorded plane for curves drawn with Splines starting in 0.22.0. It is stored in the curve's local coordinates and follows the object's transform. After Attach, the active destination supplies this plane. **View Plane** faces the viewport and passes through the average of the selected anchors. It is the available choice for curves without a saved drawing plane. Legacy 2D curves stay 2D. To flatten onto a plane that would move control points out of local XY, first set the curve's Dimensions to **3D**. Make Planar is one native Undo step and preserves the object and its transform.
+
+In Object Mode, select two or more editable Bézier curve objects and leave the destination active. **Attach Curves** joins the selection in a single Undo step. Use the viewport or the Outliner to select a large batch, then click the button in the Splines sidebar. Each path stays separate inside the destination. One unsupported source cancels the entire batch. Attach retains the active curve's data settings and uses Blender's native material-slot mapping.
+
+## M6 Detach
+
+In **3 Spline**, click a complete path or Shift-click to select additional paths. **Detach**, below **Weld Verts** in the Splines sidebar, moves the selected paths together into a new editable Bézier curve object. Both objects retain the existing path positions and curve transforms. The new object has independent curve data. Editing stays on the original object, and one Undo restores the selected paths to it.
+
+Detach is available when at least one complete path is selected and at least one path will stay on the original object. Use single-user curve data for this action. The existing topology safeguards for shape keys, curve-data animation, and Hook modifiers apply.
+
+## M5 Make Profile and direct level entry
+
+In Object Mode, select a Bézier curve and check **Make Profile** in the Splines sidebar. The checkbox starts off. **Rectangle** is the default shape. **Height** and **Width** start at one Blender unit each, or one foot each in an Imperial scene. **Roll** starts at zero and rotates the rectangle around the path. **Circle** shows **Radius**, which starts at half the same unit size. Length fields use Blender's scene units.
+
+The profile is centered on the path and open paths are capped. On a path drawn in the local XY plane, zero roll puts height along local Z. The profile updates when editing the source spline. Turning it off preserves the settings for next time. Curves using Blender's native bevel or extrusion must clear those settings before enabling Make Profile. To use a profiled object as an Attach source, first turn off Make Profile. An active destination's profile sweeps all paths attached to it.
+
+From Object Mode with one supported curve selected, **2** enters **2 Segment** and **3** enters **3 Spline**. **1** and **6** open **1 Vertex**. These shortcuts activate Q Select. In Edit Mode, the level shortcuts preserve the current Splines tool.
+
+## M5 Curve Resolution and profile defaults
+
+In Object Mode, **Curve Resolution** above **Make Profile** sets how finely Blender evaluates curved spans. Higher values make the sweep smoother along bends. The Bézier anchors and handles define the same path at every resolution.
+
+Click a Rectangle **Height** or **Width** value in the Splines sidebar, enter a dimension, and confirm with **Set**. The edit remembers that dimension independently for the entire .blend file. The next curve with a newly enabled profile starts with those dimensions. Each existing profile keeps its individual settings. Remembered lengths follow the active scene's unit scale. Save the .blend to retain these defaults for the next session.
+
+## Edit Mode recovery
+
+Splines edits one Bézier curve object at a time. If Blender enters native Edit Mode with multiple objects or a curve containing a different path type, the Splines sidebar explains the context and provides an **Object Mode** button. Select one Bézier curve object in Object Mode and press **6** to resume Splines editing.
+
+## M5 Mitered profile corners
+
+New Rectangle profiles miter the inner and outer faces at bends, keeping the width through ordinary corners. The miter extension is limited to twice the cross-section offset, which limits spikes on turns beyond 120°. Open ends are capped. Curves whose short runs or tight bends overlap the profile still require more space at the turn.
+
+For an existing profile, select the curve in Object Mode and click **Update Profile Corners** in the Splines sidebar. The operation uses the current modifier's shape, Height, Width, Radius, and Roll. One Undo restores the previous profile.
+
+## Edit and Object Mode shortcuts
+
+In a 3D Viewport, **4**, **Enter**, and **Numpad Enter** return to Object Mode from Curve Edit Mode, including native multi-object editing with the sidebar hidden. During a Splines transform, these keys cancel its preview before leaving Edit Mode. Pressing **4** again with a curve selected stays in Object Mode. Use the Edit Splines sidebar's **All** button to select every path in the current curve object.
+
+Press **6** or click **Edit Spline** to edit the active selected Bézier curve. With several objects selected, the **Edit Active** button and **6** enter Edit Mode with the active curve selected by itself. **1**, **2**, and **3** enter the corresponding levels from Object Mode when one supported curve is selected. The sidebar's **Object Mode (4 / Enter)** button also finishes editing.
+
+### Sidebar follows the active object
+
+When the 3D Viewport sidebar is open, selecting an editable Bézier curve or entering Curve Edit Mode activates **Splines**. Selecting or creating a mesh from the **Splines** tab in Object Mode activates Blender’s **Item** tab. A closed sidebar stays closed. Users can choose another tab while the active object and mode stay the same, and can still open **Splines** manually to draw.

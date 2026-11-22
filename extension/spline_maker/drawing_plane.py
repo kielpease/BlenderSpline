@@ -8,6 +8,10 @@ from mathutils import Vector
 from mathutils.geometry import interpolate_bezier
 
 
+DRAWING_PLANE_KEY = "spline_maker_drawing_plane"
+DRAWING_PLANE_XY = "LOCAL_XY"
+
+
 class DrawingPlane:
     def __init__(self, origin, rotation):
         self.origin = origin.copy()

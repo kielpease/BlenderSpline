@@ -56,9 +56,10 @@ class GestureViewport:
 
 
 def active_gestures():
-    from . import drawing_probe, edit_drag, tangent_drag, vertex_selection
+    from . import drawing_probe, edit_drag, insert_vertex, tangent_drag, vertex_selection
 
-    return (drawing_probe._active, edit_drag._active, tangent_drag._active, vertex_selection._gesture)
+    return (drawing_probe._active, edit_drag._active, insert_vertex._active,
+            tangent_drag._active, vertex_selection._gesture)
 
 
 def check_gestures():
@@ -77,19 +78,23 @@ def watch():
 
 @persistent
 def before_data_change(_):
-    from . import region_selection, transform_gizmos
+    from . import display, region_selection, transform_gizmos
 
     for gesture in active_gestures():
         if gesture is not None:
             gesture.cancel(bpy.context)
     if bpy.app.timers.is_registered(check_gestures):
         bpy.app.timers.unregister(check_gestures)
+    display.reset_native_handles()
     region_selection.clear_cache()
     transform_gizmos.clear_cache()
 
 
 @persistent
 def after_load(_):
+    from .ui import reset_sidebar_following
+
+    reset_sidebar_following()
     for manager in bpy.data.window_managers:
         manager.property_unset("spline_maker_selection_level")
         manager.property_unset("spline_maker_vertex_rotation")
@@ -134,7 +139,10 @@ def register():
 
 
 def unregister():
+    from .ui import reset_sidebar_following
+
     before_data_change(None)
+    reset_sidebar_following()
     if bpy.app.timers.is_registered(reset_tools):
         bpy.app.timers.unregister(reset_tools)
     reset_tools()

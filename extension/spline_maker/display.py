@@ -9,6 +9,7 @@ from .drawing_probe import draw_batch
 from . import segment_selection, region_selection
 
 _handler = None
+_native_handles = {}
 
 
 def redraw(self, context):
@@ -31,9 +32,57 @@ def active(context):
 
 def draw():
     context = bpy.context
+    from .ui import follow_active_object
+    from .vertex_selection import selection_active
+    follow_active_object(context)
+    if (selection_active(context) and context.space_data.overlay.display_handle != "NONE"
+            and not bpy.app.timers.is_registered(sync_native_handles)):
+        bpy.app.timers.register(sync_native_handles)
     if active(context):
         draw_curves(context)
     draw_transform_readout(context)
+
+
+def restore_native_handles(spaces):
+    for key in spaces:
+        space, previous = _native_handles.pop(key)
+        try:
+            if space.overlay.display_handle == "NONE":
+                space.overlay.display_handle = previous
+        except ReferenceError:
+            pass
+
+
+def sync_native_handles():
+    # Defer RNA writes until after the draw callback. Blender's native handle
+    # overlay otherwise draws the same handles independently of our picker.
+    from .vertex_selection import selection_active
+    context = bpy.context
+    active_spaces = set()
+    for manager in bpy.data.window_managers:
+        for window in manager.windows:
+            for area in window.screen.areas:
+                if area.type != "VIEW_3D":
+                    continue
+                region = next((region for region in area.regions if region.type == "WINDOW"), None)
+                if region is None:
+                    continue
+                with context.temp_override(window=window, area=area, region=region):
+                    if selection_active(context):
+                        space = context.space_data
+                        key = space.as_pointer()
+                        active_spaces.add(key)
+                        if space.overlay.display_handle != "NONE":
+                            _native_handles[key] = (space, space.overlay.display_handle)
+                            space.overlay.display_handle = "NONE"
+    restore_native_handles(_native_handles.keys() - active_spaces)
+    return 0.15 if _native_handles else None
+
+
+def reset_native_handles():
+    if bpy.app.timers.is_registered(sync_native_handles):
+        bpy.app.timers.unregister(sync_native_handles)
+    restore_native_handles(tuple(_native_handles))
 
 
 def draw_curves(context):
@@ -120,6 +169,7 @@ def register():
 
 def unregister():
     global _handler
+    reset_native_handles()
     if _handler is not None:
         bpy.types.SpaceView3D.draw_handler_remove(_handler, "WINDOW")
         _handler = None

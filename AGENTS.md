@@ -9,11 +9,11 @@ Implement the requested issue only, plus necessary dependencies. Do not implemen
 ## Interaction rules
 
 - Click corners; click-drag Bézier handles; Shift constrains placement in 45-degree increments on a fixed drawing plane.
-- Q/W/E/R select tools. The 0.15.3 candidate puts 1 Vertex, 2 Segment, 3 Spline, and 4 All at the top of the Edit panel. Enter finishes editing, and Esc still cancels a drag or exits when idle. 3 auto-selects the sole spline, or selects individual open or closed paths when multiple paths exist. 6 enters Spline Maker vertex editing for a single selected editable Bezier curve. Preserve native 5 and other-object mode controls. Keep extension bindings scoped.
+- Q/W/E/R select tools. The Edit panel offers 1 Vertex, 2 Segment, 3 Spline, and an All button. 4 returns to Object Mode from Curve Edit Mode. Enter also finishes editing, and Esc cancels a drag or exits when idle. 3 auto-selects the sole spline, or selects individual open or closed paths when multiple paths exist. 6 enters vertex editing for the active editable Bezier curve. Preserve native 5 and other-object mode controls. Keep extension bindings scoped.
 - All essential actions need visible buttons or contextual menu entries.
-- For one selected editable Bezier curve, 1/6 from Object Mode enter Vertex editing with Spline Maker Q Select active. In supported Curve Edit Mode, Q can enter Spline Maker Select from a native tool while preserving component level/selection. W/E/R remain scoped to an active Spline Maker tool.
+- For one selected editable Bezier curve in Object Mode, 1 enters Vertex, 2 enters Segment, and 3 enters Spline editing with Q Select active. 6 edits the active Bezier curve by itself when multiple objects are selected. In supported Curve Edit Mode, Q can enter Spline Maker Select from a native tool while preserving component level/selection. W/E/R remain scoped to an active Spline Maker tool.
 - Segment box selection selects a segment when any part of its projected curve touches or crosses the box, in either drag direction. Spline/Whole box selection still requires complete enclosure.
-- Vertex Move centers its gizmo on the selected anchors. Vertex Rotate/Scale defaults to editing tangents about each selected anchor. E Rotate also offers Group, which rotates selected anchors and handles together. Segment/Spline/Whole Rotate/Scale transforms source geometry about the average of unique selected anchors. Shared endpoints transform once. Direct handle diamonds remain freely draggable.
+- Vertex Move centers its gizmo on the selected anchors. Vertex Rotate defaults to Group in 0.19.0 and offers Tangents for per-anchor rotation. Vertex Scale edits tangents about each selected anchor. Segment/Spline/Whole Rotate/Scale transforms source geometry about the average of unique selected anchors. Shared endpoints transform once. Direct handle diamonds remain freely draggable.
 - Do not substitute a hotkey-heavy workflow for the specification.
 - Distinguish breaking tangent linkage (Bézier Corner) from splitting spline topology (Break).
 - Closed-region selection is a logical spline region, not editable generated mesh faces.
@@ -39,11 +39,19 @@ For each change: summarize behavior, files changed, tests, limitations, and a sh
 - **SM-016 interaction integration** was pushed to `main` in commit `0413429` with the **0.16.0** ZIP available locally under `dist/`.
 - `drag_navigation.py` forwards viewport navigation events and detects projection changes during edit gestures. Move, Rotate, Scale, and direct handles rebase their input from the applied preview. Edit entry via **1** or **6** records a native Edit Mode checkpoint for the first transform Undo.
 - **SM-017 lifecycle and save/reopen** passed on Blender 5.2.4 LTS for Windows. [Test results](docs/TEST_PLAN.md#sm-017-lifecycle-and-savereopen)
-- **SM-018 packaging and user guide** completes the local build. The next editing task is **Insert Vertex** with Bézier shape preservation. [User guide](docs/USER_GUIDE.md) · [Roadmap](docs/ROADMAP.md#m6--extended-editing)
+- **SM-018 packaging and user guide** completes the local stable build. M6 runs before M5. The owner accepted **0.22.0** and requested a visible **Detach** button in **3 Spline**. Version **0.23.0** adds that button. [Viewport check](docs/BUILD.md#0230-detach) · [Roadmap](docs/ROADMAP.md#m6--extended-editing)
+- **M5** starts in the owner-accepted **0.24.0** build with live profiles and direct **2/3** entry from Object Mode. **0.25.0** adds Curve Resolution and remembers the last Rectangle Height and Width in the file. [Viewport check](docs/BUILD.md#0250-curve-resolution-and-profile-defaults)
+- **0.25.1** explains when native Edit Mode includes multiple objects and offers **Return to Object Mode**. **0.25.2** makes **Enter** available for this exit while the Splines sidebar tab is visible. [Viewport check](docs/BUILD.md#0252-enter-from-the-splines-panel)
+- **0.26.0** adds bounded mitered joins to Rectangle profiles. Use **Update Profile Corners** on a curve with an older generated profile. [Viewport check](docs/BUILD.md#0260-mitered-profile-corners)
+- **0.26.1** makes **4** return to Object Mode from any Curve Edit context. **6** edits the active Bézier curve on its own. [Viewport check](docs/BUILD.md#0261-edit-and-object-mode)
+- **0.26.2** gives **Enter** and **Numpad Enter** the same exit behavior as **4** in Curve Edit Mode. [Viewport check](docs/BUILD.md#0262-enter-and-numpad-enter)
+- **0.26.3** switches the open 3D Viewport sidebar to **Splines** for the active Bézier curve and back to **Item** when selecting or adding a mesh from the Splines tab. [Viewport check](docs/BUILD.md#0263-sidebar-follows-selection)
+- **0.26.4** adds the Bézier icon to **Add → Curve → Draw Spline** and documents the current drawing, editing, and profile workflows. [Viewport check](docs/BUILD.md#0264-draw-spline-menu-icon)
 
 ### Current implementation details
 
-- `feasibility.py`: workspace tools, keymaps, entry/exit, Edit sidebar and shared selection-center pivots. `1/6` from Object Mode enter one selected editable Bezier curve with Q Select active; Q can also enter from a supported native Curve Edit tool. Native W/E/R stay native until Spline Maker is active.
+- `feasibility.py`: workspace tools, keymaps, entry/exit, Edit sidebar and shared selection-center pivots. Object Mode entry activates Q Select at the requested level. Native W/E/R stay native until Spline Maker is active.
+- `profile.py`: builds and reuses a native Geometry Nodes group. Each object stores its own profile inputs in a modifier. Object Mode Height and Width edits also save the last-entered defaults in the group for newly enabled profiles. Curve Resolution uses the native curve data.
 - `segment_selection.py`: native segment identity, curve sampling, crossing-box selection and level controls. `region_selection.py`'s internal `REGION` value now means the visible **3 Spline** level; it handles open and closed paths. Keep that distinction when reading earlier Region-only planning.
 - `edit_drag.py`: Move and shared world-space ray/plane projection. `tangent_drag.py`: Vertex tangent editing and Segment/Spline/Whole geometry rotation/scaling. Shared endpoints transform once. Composite pivot is the average of unique selected anchors; Whole includes hidden points.
 - `transform_gizmos.py`: one tool-owned gizmo group. Q hides controls. Move hides its gizmo during a drag, and Rotate and Scale retain their controls and readout. The offset blue XY square scales X/Y together with world Z fixed in composite R mode. The white center scales XYZ uniformly.
@@ -60,7 +68,7 @@ From the repository root, set `$blender` to the local Blender 5.2.4 executable a
 ```powershell
 New-Item -ItemType Directory -Force dist | Out-Null
 & $blender --command extension build --source-dir extension/spline_maker --output-dir dist
-& $blender --command extension validate dist/spline_maker-0.18.1.zip
+& $blender --command extension validate dist/spline_maker-0.26.4.zip
 ```
 
 Use the isolated-profile smoke-test command in `docs/BUILD.md`; it sets/restores `BLENDER_USER_RESOURCES` and installs into a fresh directory under `dist`, protecting the normal Blender profile. The entry point is `tests/blender/smoke_registration.py`, which runs the segment, region/spline, controls, Whole Move, transform and entry regression modules. Disable the previous build and restart Blender before installing a new ZIP for hands-on testing.

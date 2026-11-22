@@ -2,9 +2,10 @@
 
 import os
 from pathlib import Path
+from types import SimpleNamespace
 
 import bpy
-from mathutils import Vector
+from mathutils import Quaternion, Vector
 
 
 def add_curve(scene, name, *, closed=False):
@@ -51,6 +52,8 @@ def activate(obj, *, extend=False):
 
 
 def run(module):
+    from control_checks import Layout
+
     context = bpy.context
     scene = bpy.data.scenes.new("Splines lifecycle")
     other_scene = bpy.data.scenes.new("Splines second scene")
@@ -64,12 +67,22 @@ def run(module):
     with viewport():
         activate(first)
         activate(second, extend=True)
-        assert not bpy.ops.spline_maker.enter_edit.poll()
+        assert bpy.ops.spline_maker.enter_edit.poll()
+        assert not bpy.ops.spline_maker.enter_object_edit_level.poll()
         assert bpy.ops.object.mode_set(mode="EDIT") == {"FINISHED"}
         assert len(context.objects_in_mode) == 2
         assert not module.vertex_selection.supported_curve(context)
         assert not bpy.ops.spline_maker.select_shortcut.poll()
-        assert bpy.ops.object.mode_set(mode="OBJECT") == {"FINISHED"}
+        assert not bpy.ops.spline_maker.exit_edit_shortcut.poll()
+        assert bpy.ops.spline_maker.finish_edit.poll()
+        layout = Layout()
+        module.feasibility.VIEW3D_PT_spline_maker_probe.draw(SimpleNamespace(layout=layout), context)
+        assert "2 objects in Edit Mode" in layout.labels
+        [(operator, button)] = layout.operators
+        assert operator == "spline_maker.finish_edit" and button.ui_kwargs["text"] == "Object Mode (4 / Enter)"
+        before = (geometry(first), geometry(second))
+        assert bpy.ops.spline_maker.object_mode_shortcut(layout.operator_context) == {"FINISHED"}
+        assert (geometry(first), geometry(second)) == before
         for obj in (first, second):
             activate(obj)
             assert bpy.ops.spline_maker.enter_edit() == {"FINISHED"}
@@ -81,6 +94,18 @@ def run(module):
                 assert geometry(first) != before
             assert bpy.ops.spline_maker.finish_edit() == {"FINISHED"}
         assert set(module.display.object_curves(context)) == {first}
+        drawing = module.drawing_plane
+        session = drawing.DrawingSession(drawing.DrawingPlane(Vector((0, 0, 2)), Quaternion()))
+        session.place(Vector((2, 0, 0)))
+        session.place(Vector((0, 1, 0)))
+        drawn = module.drawing_probe.commit_curve(context, session)
+        drawn_name = drawn.name
+        assert bpy.ops.spline_maker.toggle_profile() == {"FINISHED"}
+        modifier = module.profile.profile_modifier(drawn)
+        assert bpy.ops.spline_maker.set_profile_dimension(dimension="Height", value=4.75) == {"FINISHED"}
+        assert bpy.ops.spline_maker.set_profile_dimension(dimension="Width", value=0.625) == {"FINISHED"}
+        module.profile.profile_input(modifier, "Shape").value = "Circle"
+        module.profile.profile_input(modifier, "Radius").value = 0.625
 
     context.window.scene = other_scene
     with viewport():
@@ -90,7 +115,7 @@ def run(module):
         assert bpy.ops.object.mode_set(mode="OBJECT") == {"FINISHED"}
         assert bpy.ops.wm.tool_set_by_id(name=module.drawing_probe.SplineMakerDrawTool.bl_idname) == {"FINISHED"}
         context.window_manager.spline_maker_selection_level = "REGION"
-        context.window_manager.spline_maker_vertex_rotation = "GROUP"
+        context.window_manager.spline_maker_vertex_rotation = "TANGENTS"
         context.window_manager.spline_maker_bright_curves = False
         context.window_manager.spline_maker_curve_color = (0.1, 0.2, 0.3)
         assert module.region_selection.regions(first.data)
@@ -105,10 +130,16 @@ def run(module):
     assert context.scene.name == "Splines second scene"
     assert context.object.name == "Saved second scene curve"
     assert not any(module.lifecycle.active_gestures())
+    assert module.make_planar.has_drawing_plane(bpy.data.objects[drawn_name].data)
+    modifier = module.profile.profile_modifier(bpy.data.objects[drawn_name])
+    assert modifier.show_viewport and modifier.show_render
+    assert module.profile.profile_input(modifier, "Shape").value == "Circle"
+    assert module.profile.profile_input(modifier, "Radius").value == 0.625
+    assert not module.make_planar.has_drawing_plane(bpy.data.objects["Saved closed curve"].data)
 
     manager = context.window_manager
     assert manager.spline_maker_selection_level == "VERTEX"
-    assert manager.spline_maker_vertex_rotation == "TANGENTS"
+    assert manager.spline_maker_vertex_rotation == "GROUP"
     assert manager.spline_maker_bright_curves
     assert all(abs(actual - expected) < 1e-6 for actual, expected in
                zip(manager.spline_maker_curve_color, (0.65, 0.8, 0.95)))
@@ -117,6 +148,17 @@ def run(module):
         assert [item.name for item in obj.users_scene] == [scene_name]
         assert geometry(obj) == state, name
         assert tuple(obj.location) == location and tuple(obj.scale) == scale, name
+
+    # Defaults are saved with the file and are shared across its scenes.
+    context.scene.unit_settings.system = "IMPERIAL"
+    context.scene.unit_settings.scale_length = 0.5
+    with viewport():
+        inherited = add_curve(context.scene, "Inherited rectangle")
+        activate(inherited)
+        assert bpy.ops.spline_maker.toggle_profile() == {"FINISHED"}
+        modifier = module.profile.profile_modifier(inherited)
+        assert module.profile.profile_input(modifier, "Height").value == 9.5
+        assert module.profile.profile_input(modifier, "Width").value == 1.25
 
     context.window.scene = bpy.data.scenes["Splines lifecycle"]
     with viewport():

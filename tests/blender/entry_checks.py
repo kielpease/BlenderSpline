@@ -53,6 +53,11 @@ def run(module):
             for use_industry in (False, True):
                 if use_industry:
                     assert bpy.utils.keyconfig_set(str(industry))
+                for key, level in (("TWO", "SEGMENT"), ("THREE", "REGION")):
+                    dispatch(key)
+                    assert bpy.context.edit_object == obj and module.segment_selection.level(bpy.context) == level
+                    assert_select()
+                    assert bpy.ops.spline_maker.finish_edit() == {"FINISHED"}
                 for key in ("ONE", "SIX"):
                     for exit_path in ("custom", "native"):
                         # Re-entry from the old native Select Box state must
@@ -94,15 +99,15 @@ def run(module):
                     assert_select()
                     bpy.ops.spline_maker.finish_edit()
             bpy.ops.object.select_all(action="DESELECT")
-            assert not bpy.ops.spline_maker.enter_vertex_edit.poll()
+            assert not bpy.ops.spline_maker.enter_object_edit_level.poll()
             assert not bpy.ops.spline_maker.enter_edit.poll()
             bpy.ops.mesh.primitive_cube_add()
             for mode in ("OBJECT", "EDIT"):
                 bpy.ops.object.mode_set(mode=mode)
-                assert not bpy.ops.spline_maker.enter_vertex_edit.poll()
+                assert not bpy.ops.spline_maker.enter_object_edit_level.poll()
                 assert not bpy.ops.spline_maker.enter_edit.poll()
                 assert not bpy.ops.spline_maker.select_shortcut.poll()
             bpy.ops.object.mode_set(mode="OBJECT")
-            print("1/6 re-entry, Q activation/button state, merged keymap priority and native guards passed")
+            print("1/2/3/6 entry, Q activation/button state, merged keymap priority and native guards passed")
     finally:
         configs.active = configs[previous]

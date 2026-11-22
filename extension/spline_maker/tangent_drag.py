@@ -6,12 +6,13 @@ import bpy
 from bpy_extras.view3d_utils import location_3d_to_region_2d
 from mathutils import Matrix, Vector
 
-from .feasibility import active_mode, move_origin, selected_vertex_handles
+from .feasibility import active_mode, is_object_mode_key, move_origin, selected_vertex_handles
 from .edit_snapping import SHIFT_KEYS
 from .drag_navigation import DragNavigation
 from . import lifecycle
 
 _active = None
+DEFAULT_VERTEX_ROTATION = "GROUP"
 
 
 def snap_angle(angle):
@@ -45,7 +46,7 @@ def uses_selection_center(context, mode):
     from .segment_selection import composite
     return composite(context) or (
         mode == "ROTATE"
-        and getattr(context.window_manager, "spline_maker_vertex_rotation", "TANGENTS") == "GROUP"
+        and getattr(context.window_manager, "spline_maker_vertex_rotation", DEFAULT_VERTEX_ROTATION) == "GROUP"
     )
 
 
@@ -56,7 +57,7 @@ def register_settings():
             ("TANGENTS", "Tangents", "Rotate the handles about each selected anchor"),
             ("GROUP", "Group", "Rotate selected anchors and handles about their average position"),
         ),
-        default="TANGENTS",
+        default=DEFAULT_VERTEX_ROTATION,
         options={"SKIP_SAVE"},
     )
 
@@ -147,7 +148,7 @@ class SPLINE_MAKER_OT_tangent_drag(bpy.types.Operator):
     @classmethod
     def poll(cls, context):
         return (context.area is not None and context.area.type == "VIEW_3D"
-                and context.region_data is not None and _active is None
+                and context.region_data is not None and not any(lifecycle.active_gestures())
                 and active_mode(context) in {"ROTATE", "SCALE"}
                 and has_selection(context))
 
@@ -278,7 +279,7 @@ class SPLINE_MAKER_OT_tangent_drag(bpy.types.Operator):
         if _active is not self or not self.viewport.matches(context):
             self.finish(context, cancel=True)
             return {"CANCELLED", "PASS_THROUGH"}
-        if self.navigation.forward(event):
+        if is_object_mode_key(event) or self.navigation.forward(event):
             return {"PASS_THROUGH"}
         if (event.type in {"ESC", "WINDOW_DEACTIVATE"} or (event.ctrl and event.type == "Z")
                 or (event.type == "RIGHTMOUSE" and event.value == "PRESS")):

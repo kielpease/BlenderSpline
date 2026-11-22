@@ -210,9 +210,13 @@ A separate Object-only `enter_vertex_edit` shortcut delegates to the existing `e
 
 Focused checks cover the real gizmo setup's operator routing and visibility using synthetic controls, XY preview math under parent/nonuniform transforms, stable Z, repeated updates, cancel and native Undo/Redo. They do not verify rendered size, placement or physical picking. The owner accepted the prior 0.15.1 entry fixes overall.
 
-## Later geometry
+## M5 profile geometry
 
-Profile generation may use Geometry Nodes or a controlled mesh generator. Choose after testing planar corner joins and alignment. Do not assume a rectangular Curve to Mesh sweep alone preserves wall thickness at every corner. Source curve remains editable; generated geometry is derived output. Height and width stay unit-aware settings independent of path vertex edits.
+`profile.py` creates one reusable Geometry Nodes group and stores each object's dimensions and shape in a native modifier. The sidebar edits its RNA inputs using Blender distance and angle fields. When edited in the sidebar, Height and Width also write the last entered physical lengths to the local node group so new modifiers can use them in any scene in the .blend. The graph uses a Z-up frame in curve coordinates, rotates the rectangular cross-section around the path, and sweeps the chosen closed cross-section with capped ends. It uses the native curve's evaluated resolution. The modifier stays live in Curve Edit Mode and saves with the .blend file.
+
+The rectangular sweep in `profile_corners.py` uses the evaluated path samples. It drops collinear interior samples where tilt is constant to avoid folded faces beside a miter on a straight run. It captures ring centers and the bend axis before the sweep, then scales only the component along the bend axis. The scale is the reciprocal cosine of half the turn, capped at 2. The original Curve to Mesh sweep produces the circle profile. [Curve to Mesh documentation](https://docs.blender.org/manual/en/4.5/modeling/geometry_nodes/curve/operations/curve_to_mesh.html)
+
+The current group version copies remembered dimensions from a legacy local group when needed. A user-initiated upgrade assigns the new graph to one existing modifier and copies all five profile inputs.
 
 ## Reference documentation
 

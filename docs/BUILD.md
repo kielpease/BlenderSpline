@@ -2,7 +2,7 @@
 
 Splines targets Blender 5.2.4 LTS on Windows. The ZIP is for local testing. The manifest carries a license placeholder until the owner selects a license and updates the metadata for distribution.
 
-Build **0.18.1** for the current local installer. The local stable ZIP contains the validated 0.18.1 package. Earlier procedures record the key mappings and features tested at those versions.
+Build **0.26.4** for the Draw Spline menu icon and the latest editing and profile tools. The local stable ZIP contains **0.18.1**. Earlier procedures record the key mappings and features tested at those versions.
 
 ## Build and validate
 
@@ -13,10 +13,10 @@ $blender = 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe'
 New-Item -ItemType Directory -Force dist | Out-Null
 & $blender --command extension validate extension/spline_maker
 & $blender --command extension build --source-dir extension/spline_maker --output-dir dist
-& $blender --command extension validate dist/spline_maker-0.18.1.zip
+& $blender --command extension validate dist/spline_maker-0.26.4.zip
 ```
 
-Blender writes the ZIP to `dist/spline_maker-0.18.1.zip` using its extension packaging commands. [Blender extension CLI documentation](https://docs.blender.org/manual/en/5.2/advanced/command_line/extension_arguments.html)
+Blender writes the ZIP to `dist/spline_maker-0.26.4.zip` using its extension packaging commands. [Blender extension CLI documentation](https://docs.blender.org/manual/en/5.2/advanced/command_line/extension_arguments.html)
 
 ## Stable local installer
 
@@ -41,7 +41,7 @@ $previousResources = $env:BLENDER_USER_RESOURCES
 try {
     $testProfile = Join-Path (Resolve-Path dist) ([guid]::NewGuid().ToString())
     $env:BLENDER_USER_RESOURCES = (New-Item -ItemType Directory $testProfile).FullName
-    & $blender --background --factory-startup --python-exit-code 1 --python tests/blender/smoke_registration.py -- dist/spline_maker-0.18.1.zip
+    & $blender --background --factory-startup --python-exit-code 1 --python tests/blender/smoke_registration.py -- dist/spline_maker-0.26.4.zip
 } finally {
     $env:BLENDER_USER_RESOURCES = $previousResources
 }
@@ -354,3 +354,95 @@ The owner subsequently confirms the 0.15.2 control works great and requests comm
 2. Start a drawing, place a point, then select a different toolbar tool. The drawing preview should disappear. With two scenes available, switch scenes and return to confirm each scene shows its own curves.
 3. Complete a Move and check Undo/Redo. In Object Mode, delete one test spline and undo the deletion. Check that the other spline stays in place.
 4. With a Splines tool selected, disable the extension in Preferences. The viewport should return to Blender's Select Box. Re-enable Splines, enter editing again, and check that the gizmos and sidebar appear once.
+
+## 0.19.0 menu polish and Add Vert
+
+1. Install `dist/spline_maker-0.19.0.zip` and press **6** on a Bézier curve. Check the centered Q/W/E/R icons. Select two vertices and press **E**. The **Rotate** dropdown should show **Group**.
+2. Right-click a value under **World position** and choose **Copy Value**. Select a different vertex, right-click the same or a different axis, and choose **Paste Value**. Check the resulting coordinate and undo once.
+3. Click **Add Vert** below the coordinates. Hover over a curved segment, then click when the preview diamond is where you want it. Check that a new vertex is selected and the curve keeps its shape. Undo, redo, and repeat on the seam of a closed spline. Esc and right-click should cancel placement.
+
+## 0.20.0 Remove and Break
+
+1. Install `dist/spline_maker-0.20.0.zip`, select a Bézier curve, and press **6**. Under **World position**, check the buttons beside and below **Add Vert**.
+2. In **1 Vertex**, select a middle anchor and click **Remove Vert** or press **Delete**. Its neighbors should connect. Undo, select the same anchor, and click **Break Verts**. The two endpoints should be coincident, with each side belonging to a different spline. Repeat with a vertex on a closed loop.
+3. In **2 Segment**, select one span and click **Remove Segment** or press **Delete**. Check that the span disappears and both endpoint vertices remain. Use Undo and Redo to verify each edit.
+
+## 0.20.1 handle visibility, collapse, and restore
+
+1. Install `dist/spline_maker-0.20.1.zip`. Enter Splines editing with **6** and check a path containing both corners and smooth Bézier vertices. Vector handles and handles on the disconnected side of an open endpoint should be hidden. Try Remove Segment and Break Verts to see the same behavior at their new endpoints.
+2. In **1 Vertex**, drag a visible handle onto its anchor. Watch for the mint preview diamond, then release. Check that the other handle stays in place and that Undo restores the collapsed handle. Try moving outside the snap radius before releasing and canceling with Esc.
+3. With the anchor selected, right-click and choose **Restore Left Handle** or **Restore Right Handle**. Check the restored diamond and drag it to refine the tangent. The same action appears in the sidebar below the vertex types.
+4. Switch to Blender's native Select Box and check that the native handle display setting returns. Re-enter Splines with **Q**.
+
+## 0.21.0 Attach and Weld
+
+1. Install `dist/spline_maker-0.21.0.zip`. In Object Mode, select two separate Bézier curves and select the destination last. Click **Attach Curves** in the **Splines** sidebar. Check that both paths stay in place as one object and that Undo restores the two objects.
+2. Press **6** on the attached object. Use **3 Spline** to select one path and **4 All** to select both.
+3. In **1 Vertex**, select one endpoint on each open path using **Shift-click** to add the second. Click **Weld Verts** below the coordinates. Check that the selected welded vertex sits at the midpoint and both connected handles remain available. Undo and redo once.
+4. On a separate open path with at least three vertices, select both ends and click **Weld Verts**. Check for a closed loop.
+
+## 0.22.0 Make Planar and batch Attach
+
+1. Disable the previous build, restart Blender, and install `dist/spline_maker-0.22.0.zip`. Draw a spline with a mix of corners and drag handles. Press **6**, select a vertex, and use **W** or the coordinate controls to move it off the drawing plane.
+2. Press **4** and click **Make Planar** under **Weld Verts**. Confirm the default **Drawing Plane**. Orbit the viewport to check that the vertices and their handles lie on the original plane. **Ctrl+Z** should restore the off-plane geometry in one step.
+3. Orbit to a different angle, open **Make Planar**, and choose **View Plane**. The selection should flatten to a plane facing the view, at the selection's average depth. Try this on an older curve and with a single segment or path selected.
+4. In Object Mode, select several Bézier curve objects in the viewport or Outliner. Make the curve whose origin and data settings you want to keep active. Click **Attach Curves** in the **Splines** sidebar. The paths should stay in place inside one object. Press **6** and use **3 Spline** to pick individual paths or **4 All** to select every path. Undo Attach from Object Mode to restore the original objects.
+
+## 0.23.0 Detach
+
+1. Disable the previous build, restart Blender, and install `dist/spline_maker-0.23.0.zip`. Select a curve object with multiple paths, such as a result from **Attach Curves**, and press **6**.
+2. Choose **3 Spline**, click a path, then click **Detach** under **Weld Verts**. The path should stay in place, with a new curve object visible in the Outliner. The original object should remain in Edit Mode with its other paths.
+3. Press **Ctrl+Z** once to move the path back. Redo, press **Enter** to finish editing, and select the detached object in the Outliner to verify that it edits independently.
+
+## 0.24.0 Make Profile
+
+1. Disable the previous build, restart Blender, and install `dist/spline_maker-0.24.0.zip`. Draw a spline in Top view and finish drawing. With it selected in Object Mode, open the Splines sidebar and check **Make Profile**.
+2. Check that **Rectangle** starts at **1 × 1** with **Roll** at **0°**. In an Imperial scene, a new profile starts at **1 ft × 1 ft**. Enter **8 ft** for Height and try **90°** for Roll.
+3. Choose **Circle** and change **Radius**. Uncheck **Make Profile** to see the source curve, then recheck it to verify the settings return.
+4. Hover over the viewport and press **2** from Object Mode. It should open Segment editing. Move a segment and check that the profile follows. Press **Enter**, then **3**. It should open Spline editing.
+
+## 0.25.0 Curve Resolution and profile defaults
+
+1. Disable the previous build, restart Blender, and install `dist/spline_maker-0.25.0.zip`. Select a spline with a curved span in Object Mode. Enable **Make Profile** and raise **Curve Resolution** from 4 to 32 to see the curved sweep become smoother.
+2. Click the Rectangle **Height** and **Width** values in the Splines sidebar and confirm each with **Set**. Draw another spline and enable **Make Profile**. Check that the new rectangle starts with those dimensions.
+3. Save and reopen the .blend. Draw another curve and enable its profile to check that it uses the saved dimensions.
+
+## 0.25.1 Edit Mode recovery
+
+1. Select two separate Bézier curve objects and enter native Edit Mode using Blender's viewport mode dropdown. Open the **Splines** sidebar. It should show how many objects are in Edit Mode and offer **Return to Object Mode**.
+2. Click **Return to Object Mode**, select one of the curve objects, and press **6**. The Splines level buttons and editing tools should return.
+
+## 0.25.2 Enter from the Splines panel
+
+Repeat the multi-object Edit Mode check with the Splines tab open. Hover over the viewport grid and press **Enter** or **Numpad Enter**. Blender should return to Object Mode directly. In Industry Compatible, native Curve Edit Mode with the Splines panel hidden and a native tool selected still uses Enter to open Rename.
+
+## 0.26.0 Mitered profile corners
+
+1. Open a curve with an existing Rectangle profile in Object Mode and click **Update Profile Corners** in the Splines sidebar. Use Top view and Wireframe to inspect the inner and outer edges where the straight sides meet.
+2. Draw a new spline with two perpendicular spans. Check **Make Profile**. Confirm that the two sides meet at clean miters and hold the specified width. Repeat with a closed path to check the seam.
+3. Undo an update to compare the old and new joins. Redo to restore the mitered profile.
+
+## 0.26.1 Edit and Object Mode
+
+1. Select a curve with its profile visible. Hover over the viewport and press **6**, then **4**, then **6** again. Repeat with **1**, **2**, or **3** for direct component-level entry.
+2. In Edit Mode, click **All** to select the entire curve. Press **4** to exit. Press **4** again and check that you remain in Object Mode.
+3. Select two curve objects and press **6** or click **Edit Active**. Only the active curve should enter Splines editing. For native multi-object Curve Edit Mode, use Blender's mode dropdown with both objects selected, then press **4** to leave.
+4. Start a Splines Move, Rotate, or Scale preview and press **4** before releasing the mouse. The preview should revert and Blender should return to Object Mode.
+
+## 0.26.2 Enter and Numpad Enter
+
+Repeat the mode-switching check with **Enter** and **Numpad Enter** while the pointer is over the viewport. Try a Splines tool and native multi-object Curve Edit Mode with the sidebar hidden. Both keys should finish editing. In an open Make Planar dialog, **Enter** confirms the plane.
+
+## 0.26.3 Sidebar follows selection
+
+1. With a Bézier curve and a cube in the scene, open the viewport sidebar with **N** in Blender’s default keymap or **Ctrl+]** in Industry Compatible.
+2. Select the curve and confirm the sidebar switches to **Splines**. Select the cube and confirm the sidebar switches to **Item**. Select the curve again and use Blender’s **Add Cube** command. The new cube should also show **Item**.
+3. Close the sidebar, select the curve, and reopen the sidebar. It should stay closed until reopened, then show **Splines**. With the same curve selected, you can switch tabs manually.
+
+The isolated viewport regression is `tests/blender/sidebar_viewport.py`. Launch a fresh test profile with `--enable-event-simulate --python tests/blender/sidebar_viewport.py -- dist/spline_maker-0.26.4.zip industry` or use `default` for Blender’s default keymap.
+
+## 0.26.4 Draw Spline menu icon
+
+1. In Object Mode, open **Add → Curve**. Confirm **Draw Spline** appears once with the Bézier icon.
+2. Click it, click to set a corner, then click-drag to pull out Bézier handles. Add a third point and close the path by clicking its first point. Undo and Redo should remove and restore the curve in one step each.
+3. Disable the extension and check that the item disappears. Re-enable it and check that it comes back once.

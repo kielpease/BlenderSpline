@@ -200,6 +200,76 @@ The versioned package is `dist/spline_maker-0.18.0.zip`. The guide covers instal
 
 Version 0.18.1 sets the maintainer to Pease Technology, LLC. The local stable ZIP is a verified copy of `dist/spline_maker-0.18.1.zip`.
 
+## M6 menu polish and Add Vert
+
+The 0.19.0 background tests check projected picking at an off-center parameter, shape preservation along the split segment and neighboring spans, and one-step Undo/Redo on open and closed curves. Cases include a closing seam, both sides of a two-vertex loop, hidden neighboring geometry, and automatic and vector tangents. Coordinate tests use a controlled clipboard value to check the copied axis, a numeric paste, and invalid inputs.
+
+The isolated Industry Compatible viewport check on Blender 5.2.4 LTS verified the centered icons, Group default, and the two right-click entries on a coordinate button. It also clicked Add Vert in the sidebar, inserted at the seam of a closed spline, and verified Undo/Redo. [Hands-on checklist](BUILD.md#0190-menu-polish-and-add-vert)
+
+## M6 Remove and Break
+
+The 0.20.0 background suite on Blender 5.2.4 LTS checks vertex removal on open and closed paths, nonadjacent segment removal, removal across a closing seam, breaking at multiple vertices, and two-vertex loops. It compares surviving spans and point attributes, checks unaffected splines and hidden points, and verifies one-step Undo/Redo and finishing Edit Mode.
+
+The isolated Industry Compatible viewport check selected a vertex and clicked Break Verts in the sidebar. It also picked a segment and a vertex and tested the Delete shortcut in their respective levels. Undo restored the original path in Edit Mode. [Hands-on checklist](BUILD.md#0200-remove-and-break)
+
+## M6 handle visibility, collapse, and restore
+
+Version 0.20.1 passed ZIP validation and the full background suite on Blender 5.2.4 LTS. The tests cover hidden Vector and disconnected handles, the six-pixel collapse radius, cancellation, keeping the opposite tangent fixed, and restoring the connected side.
+
+The isolated Industry Compatible viewport test dragged a linked handle into the collapse radius and confirmed the preview and committed geometry. It verified Undo/Redo, clicked **Restore Right Handle** in the right-click menu, and confirmed the hidden sides after segment removal. The collapsed handle survived saving and reopening. Blender's usual handle display returned after tool exit, reopen, and extension disable. [Hands-on checklist](BUILD.md#0201-handle-visibility-collapse-and-restore)
+
+## M6 Attach and Weld
+
+The 0.21.0 background suite on Blender 5.2.4 LTS verifies Attach with rotated, parented, nonuniformly scaled curves, a 2D destination, and shared destination data. It checks world-space anchors and handles, path closure, the active object's transform, independent geometry on the neighboring linked object, and native Undo/Redo. Weld checks all four endpoint orientations, closing an open path, rewelding a broken loop, preserving the two connected tangent offsets, and Undo/Redo.
+
+The isolated Industry Compatible viewport test clicked **Attach Curves** in Object Mode, verified both paths stayed in place, and used **4 All** after entering Edit Mode. It then selected two endpoints with Shift-click, clicked **Weld Verts**, and verified the midpoint and both connected handles. Each edit passed native Undo/Redo. [Hands-on checklist](BUILD.md#0210-attach-and-weld)
+
+## M6 Make Planar and batch Attach
+
+Version 0.22.0 passed ZIP validation and the full background suite on Blender 5.2.4 LTS for Windows. Attach preserved the world-space geometry of 512 open and closed paths from 256 curve objects, including curves with shared data and nonuniform transforms. One Undo restored every source object, and Redo restored the batch. The tests reject mixed selections and confirm an unsupported source leaves the whole batch intact.
+
+Make Planar checks exact control-point projection within floating-point tolerance at all four selection levels, including hidden points selected by **4 All**. The checks cover the original drawing plane on a parented, nonuniformly scaled curve, the view plane at the selection center, native Undo/Redo, and the saved drawing plane after reopening a .blend. They also flatten all 512 attached paths in one operation and check the legacy 2D safeguard.
+
+The isolated Industry Compatible viewport suite clicked **Attach Curves** with three selected objects, then used **4 All** and welded two endpoints. It also clicked **Make Planar**, confirmed the default Drawing Plane and verified Undo/Redo, then switched to View Plane and checked the projected anchors and handles. Esc in the dialog left the geometry intact. The 0.22.0 ZIP also passed the lifecycle, coordinate menu, Add Vert, topology, handle collapse and restore, drag-to-close drawing, and gizmo navigation viewport regressions. The owner accepted 0.22.0. [Hands-on checklist](BUILD.md#0220-make-planar-and-batch-attach)
+
+## M6 Detach
+
+Version 0.23.0 passed ZIP validation and the full background suite on Blender 5.2.4 LTS for Windows. The background checks detach one closed path and multiple open paths, verify unchanged anchors, handles and object transforms, and cover independent curve data, hidden paths, partial native selection flags, shared data, and one-step Undo/Redo.
+
+An isolated Industry Compatible viewport test attached three paths, pressed **6** and **3**, selected one path by clicking it, and clicked **Detach** in the Splines sidebar. It verified that the path stayed in place in a separate object, then checked Ctrl+Z, Redo, and finishing Edit Mode. [Hands-on checklist](BUILD.md#0230-detach)
+
+## M5 Make Profile
+
+Version 0.24.0 passed ZIP validation and the full background suite on Blender 5.2.4 LTS for Windows. Evaluated mesh checks measured the unit rectangle, an Imperial 8 ft × 1 ft rectangle at nondefault scene scale, 90° roll, and the circle radius. They verified end caps and closed paths, live source edits, off/on toggling, attaching an unprofiled source to a profiled destination, and saved shape and dimensions after reopening a .blend.
+
+The isolated Industry Compatible viewport test clicked **Make Profile**, typed **8 ft** and **90°**, switched from Rectangle to Circle, and typed a new radius. It verified live dimensions and Undo/Redo, toggled the profile off and on, and pressed **2** and **3** directly from Object Mode. The background suite also checks those bindings in the default Blender keymap. [Hands-on checklist](BUILD.md#0240-make-profile)
+
+## M5 Curve Resolution and profile defaults
+
+The 0.25.0 background suite on Blender 5.2.4 LTS for Windows measured the increase in evaluated mesh vertices and faces between Curve Resolution 4 and 32 and compared the Bézier geometry before and after. It checks independent Height and Width defaults, existing modifier values, and a .blend save/reopen followed by creating a profile in a different scene unit scale.
+
+The isolated Industry Compatible viewport test typed **8 ft** and **6 in** into Rectangle Height and Width, verified Undo and Redo of a value and the remembered default, and measured the effect of changing Curve Resolution. It confirmed that cancelling a typed edit preserved the previous default and checked both inherited dimensions on a second curve. [Hands-on checklist](BUILD.md#0250-curve-resolution-and-profile-defaults)
+
+## Edit Mode recovery
+
+The 0.25.1 ZIP and full background suite passed on Blender 5.2.4 LTS for Windows. The multi-object fixture verified that the Splines panel explains why the tools are unavailable, routes **Return to Object Mode** to Blender's mode operator, and preserves both curves. An isolated Industry Compatible viewport check clicked the recovery button and pressed **6** on a single selected curve to restore the Splines controls. [Hands-on checklist](BUILD.md#0251-edit-mode-recovery)
+
+The 0.25.2 test repeats the multi-object recovery using main **Enter**, verifies **Numpad Enter** from a native curve tool with the Splines tab visible, and exits with an active Splines tool and the sidebar hidden. The native Industry Compatible Rename prompt still opens from a native curve tool with the sidebar hidden. Both the background suite and the isolated viewport checks passed. [Hands-on checklist](BUILD.md#0252-enter-from-the-splines-panel)
+
+## M5 Mitered profile corners
+
+The 0.26.0 background suite on Blender 5.2.4 LTS for Windows measures both wall offsets and profile height at mirrored right angles, 60° and 105° turns, and closed paths in both winding directions. It checks the 2× extension limit on a 165° turn, finite output at duplicate points, retained straight-run tilt, and the source Bézier coordinates.
+
+The isolated Industry Compatible viewport test opened a .blend created with 0.25.2, clicked **Update Profile Corners**, and compared the before-and-after wireframes. It verified matched widths at the two bottom corners, independent remembered dimensions on a new curve, and Undo/Redo of the update. [Hands-on checklist](BUILD.md#0260-mitered-profile-corners)
+
+## Edit and Object Mode
+
+The 0.26.0 viewport reproduction confirmed that **1/2/3/6** entered editing on a single upgraded profile, and that **6** was disabled with multiple objects selected. The 0.26.1 ZIP validation and full background suite passed on Blender 5.2.4 LTS for Windows.
+
+Isolated viewport checks with Industry Compatible and Default verified **6** from multi-selection, **1/2/3** on one curve, the sidebar **All** button, repeated **4** in Object Mode, and **4** from native multi-object Curve Edit Mode with the sidebar closed. The Industry Compatible checks also clicked **Edit Active** and **4 Object Mode**, exercised **4** during Move, Rotate, Scale, and Add Vert previews, and reran the native editing lifecycle and save/reopen checks. [Hands-on checklist](BUILD.md#0261-edit-and-object-mode)
+
+The 0.26.2 background suite and isolated viewport checks passed on Blender 5.2.4 LTS for Windows. Both keymaps passed all three exit keys from native multi-object editing and from a Splines tool with the sidebar hidden. The Industry Compatible check verified cancellation during Move and Rotate previews using the Enter keys. It also confirmed Make Planar with Enter and checked Blender's Rename prompt in Object Mode. [Hands-on checklist](BUILD.md#0262-enter-and-numpad-enter)
+
 ### 0.15.3 edit controls
 
 ZIP validation and the full background suite passed on Blender 5.2.4 LTS for Windows. Regression checks verify the averaged Vertex Move pivot and a Group rotation that moves selected anchors and handles together on a parented, nonuniformly scaled curve. An isolated Industry Compatible Blender session verified keyboard entry with 6, 4 All in Edit Mode, and exit with Enter and Numpad Enter. Physical gizmo gestures and the panel layout remain in the [viewport check](BUILD.md#0153-edit-controls-viewport-check).
@@ -225,9 +295,18 @@ Version 0.15.8 passed ZIP validation and the full background suite on Blender 5.
 5. Cancel each transform and undo/redo. Switch tools/levels without losing intended selection.
 6. Leave Spline Maker context. Confirm normal Blender shortcuts remain intact.
 
+### 0.26.3 Sidebar follows selection
+
+Isolated viewport checks passed on Blender 5.2.4 LTS for Windows with Industry Compatible and Default. They clicked between a Bézier curve and an existing cube, added a new cube through Blender’s command search, and checked sidebar switching through Undo and Redo. They also verified **6** and **Enter** on the curve, a manual tab choice, and selecting a curve while the sidebar was closed. The packaged background suite passed. [Hands-on checklist](BUILD.md#0263-sidebar-follows-selection)
+
+### 0.26.4 Draw Spline menu icon
+
+- Clean ZIP install, menu registration and the full background suite passed on Blender 5.2.4 LTS for Windows. The native Add → Curve menu showed the Bézier icon beside **Draw Spline** with both keymaps. Clicking the entry started drawing, placed corners and Bézier handles, closed a nine-vertex path, and supported Undo and Redo. The same path was used to verify Segment Move gizmo activation and preview a live Rectangle profile.
+- The sidebar and lifecycle viewport regressions passed. A separate profile upgraded from 0.26.3 to 0.26.4 across a Blender restart and retained exactly one **Draw Spline** callback. [Hands-on checklist](BUILD.md#0264-draw-spline-menu-icon)
+
 ## Release gate
 
-Save/reopen .blend, multiple objects, scene changes, delete active object, undo through object creation, disable/re-enable, clean ZIP install. Confirm handlers, keymaps, menus, and overlays are cleaned up.
+Repeat the checks against the final release ZIP. Install in a clean Blender profile, then verify drawing from the Add menu and switching the sidebar between curves and meshes. Check edit entry and exit, transform and topology Undo/Redo, and live profile dimensions. Save and reopen the .blend. Exercise scene and active-object changes, deletion, undo through creation, and disable/re-enable. Confirm Blender restores its native tools and the extension removes its handlers, keymaps, menus, and overlays.
 
 ## Meaningful automated checks
 

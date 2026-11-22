@@ -9,8 +9,8 @@ Issue IDs below are proposed labels, not existing GitHub issue numbers. Complete
 | M2: Editing alpha              | Predictable component picking and contextual editing | M1                                  |
 | M3: Transform beta             | Q/W/E/R and all four selection levels                | M2                                  |
 | M4: First usable release       | Reliable editing, packaging, documentation           | M3                                  |
-| M5: Profile geometry           | Live height/width rendering                          | M4                                  |
-| M6: Extended editing           | Insert/delete, attach, weld, and related operations  | M4; geometry integration follows M5 |
+| M6: Extended editing           | Insert/delete, break, attach, detach, weld, and Make Planar | M4                           |
+| M5: Profile geometry           | Live height/width rendering                          | M6                                  |
 
 ## M0 — Foundation and feasibility
 
@@ -37,7 +37,7 @@ Issue IDs below are proposed labels, not existing GitHub issue numbers. Complete
 
 ## M3 — Transform beta
 
-- **SM-013 — Tool/level controls.** Visible Q/W/E/R and scoped entry/exit keys. In supported Curve Edit Mode, 1/2/3/4 choose Vertex, Segment, Spline, or All. 6 enters Vertex editing from Object Mode and Enter finishes editing. Tool changes preserve selection and Q hides the gizmos.
+- **SM-013 — Tool/level controls.** Visible Q/W/E/R and scoped entry/exit keys. In supported Curve Edit Mode, 1/2/3 choose Vertex, Segment, or Spline, with All in the sidebar. 6 edits the active Bézier curve and 4 returns to Object Mode. Enter also finishes editing. Tool changes preserve selection and Q hides the gizmos.
 - **SM-014 — Move.** Native or custom gizmo moves vertices with handles, individual handles, segments, individual splines, and all source splines together. Done: shared vertices transformed once; world-axis/plane deltas respect native object transforms; cancel and native Undo/Redo restore complete geometry. Whole curve Move in Edit Mode translates source geometry to stay within native Curve Edit undo; Object Mode provides native object transforms.
 - **SM-015 — Rotate and scale.** Vertex mode rotates/scales tangent handles around their anchors. Segment/Spline/Whole levels transform selected source geometry about the average of unique selected anchors, with shared endpoints once. Handles retain their direct-drag controls; handle-only selection does not create a vertex gizmo. Done: documented multi-selection/pivot behavior, cancel and native Undo/Redo match UI tests.
 - **SM-016 — Interaction integration.** Confirm cancel, undo/redo, axis constraints, navigation, and context menu around gizmos. Done: no transform jumps, swallowed navigation, or leaked keymaps.
@@ -47,15 +47,31 @@ Issue IDs below are proposed labels, not existing GitHub issue numbers. Complete
 - **SM-017 — Lifecycle and save/reopen.** Test multiple curve objects, scene changes, undo invalidation, tool exit, save/reopen, disable/re-enable. Done: no orphan overlays/handlers or data loss.
 - **SM-018 — Package and user guide.** Version 0.18.0 completes the local installer and user guide. Clean installation passed on Blender 5.2.4 LTS for Windows. Public distribution awaits the owner's license decision. [User guide](USER_GUIDE.md) · [Test results](TEST_PLAN.md#sm-018-package-and-user-guide)
 
-## M5 — Profile geometry (deferred)
-
-Live rectangular profile with Height/Width; unit-aware input; base/center/top and inside/center/outside alignment. Validate 8 ft × 1 ft walls. Keep source spline editable. Solve corner joins, miter limits, winding, curved paths, intersections, normals, materials, and save/reopen. Implement simple planar cases first; arbitrary 3D paths are a separate extension of scope.
-
 ## M6 — Extended editing
 
-Insert vertex preserving Bézier shape; delete vertex with explicit resulting topology; attach/detach splines across object transforms; weld compatible endpoints with tolerance; split/break topology. Later candidates: fillet/chamfer, outline, reverse, normalize, and advanced snapping. Each becomes a separately specified issue.
+1. **Menu polish and Add Vert** were accepted in 0.19.0. The test build centers the tool icons, defaults to Group rotation, adds coordinate copy and paste, and inserts on a picked Bézier segment with shape preservation. [Viewport check](BUILD.md#0190-menu-polish-and-add-vert)
+2. **Remove Vert, Remove Segment, and Break Verts** are in the 0.20.0 test build. Delete follows Vertex and Segment levels while a Splines tool is active. The 0.20.1 follow-up hides unused and Vector handles and adds collapse and restoration before Attach and Weld. [Topology check](BUILD.md#0200-remove-and-break) · [Handle check](BUILD.md#0201-handle-visibility-collapse-and-restore)
+3. **Attach and Weld** are in the M6 test build. Attach combines the selected objects in one operation and keeps their paths in place. Weld joins two open endpoints at their midpoint or closes one path. [Viewport check](BUILD.md#0210-attach-and-weld)
+4. **Make Planar** and batch Attach were accepted in 0.22.0. Make Planar projects selected anchors and handles onto the recorded drawing plane or a plane facing the current view. [Viewport check](BUILD.md#0220-make-planar-and-batch-attach)
+5. **Detach** is in the 0.23.0 test build. In **3 Spline**, it moves selected paths into a new curve object. [Viewport check](BUILD.md#0230-detach)
 
-**Next editing task — Insert Vertex.** Insert an editable vertex on a picked Bézier segment while preserving its shape. Cover open and closed splines, native Undo/Redo, and a visible editing action.
+Later candidates include fillet/chamfer, outline, reverse, normalize, and advanced snapping.
+
+## M5 — Profile geometry
+
+The owner accepted **0.24.0**, which adds live centered Rectangle and Circle profiles with unit-aware dimensions and Rectangle Roll. **0.25.0** exposes Curve Resolution to smooth the sweep on curved spans and reuses the file's last-entered Rectangle Height and Width for new profiles. [Viewport checklist](BUILD.md#0250-curve-resolution-and-profile-defaults)
+
+**0.26.0** keeps the Rectangle width through ordinary mitered corners and limits the extension at acute corners. Older profiles have a sidebar update action. [Viewport checklist](BUILD.md#0260-mitered-profile-corners)
+
+Next are base/center/top and inside/center/outside alignment, overlap handling at tight bends and path intersections including T-junctions, and material behavior.
+
+## 1.0 release preparation
+
+The 0.26.4 development build adds a Bézier icon to **Add → Curve → Draw Spline** and includes the M6 editing tools and M5 live profiles documented in the [user guide](USER_GUIDE.md).
+
+- Review 0.26.4 in a clean Blender profile with the Default and Industry Compatible keymaps. Use the [release gate](TEST_PLAN.md#release-gate) and [viewport checks](BUILD.md#0264-draw-spline-menu-icon).
+- Confirm the distribution license and apply it to the repository and Blender manifest.
+- Build and validate the approved 1.0 ZIP, confirm a clean install, and use that artifact for the GitHub release.
 
 ## Suggested GitHub labels
 
@@ -82,7 +98,7 @@ Track status as Backlog → Ready → In progress → Needs user test → Done. 
 - **SM-016 interaction integration — 0.16.0 candidate:** native navigation reaches active drag handlers, and transforms keep their preview while the viewport changes. The first drag after entering Edit Mode has a native Undo checkpoint. See the [viewport check](BUILD.md#0160-interaction-integration-viewport-check).
 - **SM-017 lifecycle and save/reopen — 0.17.0:** background and isolated Industry Compatible viewport checks passed on Blender 5.2.4 LTS. Committed curves survive save/reopen, and switching tools or scenes clears live previews. Disable/re-enable restores native Select Box and registers each callback once. [Viewport check](BUILD.md#0170-lifecycle-viewport-check)
 - **0.15.3 edit controls — Needs user test:** Center Vertex Move, add optional Vertex Group rotation, and put selection levels at the top with 4 All and Enter to finish. The owner reported exploratory moves across viewport orientations, vertices, segments and splines without major issues.
-- **Deferred — Make Planar:** Consider a visible action for selected geometry, individual splines, and All that flattens anchors and handles to the original drawing plane.
+- **Make Planar:** Implemented in the M6 0.22.0 test build.
 
 - **0.12.3 workflow follow-up - Done:** owner accepts the version, explicitly confirming spline color and 4 returning to Object Mode with the Edit menu disappearing. The owner previously reported selection working. This is overall version acceptance, not an itemized report for every drawing or selection test.
 - **0.12.4 Edit entry follow-up - Done:** owner confirms pressing 6 works well. It enters Q Select / Vertex editing for one selected editable Bezier curve. Meshes, unsupported curves, and multi-object selections retain native behavior; 5 stays native. The sidebar button was not separately reported.

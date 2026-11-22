@@ -3,11 +3,9 @@
 import bpy
 from bpy_extras.view3d_utils import location_3d_to_region_2d
 
-from .feasibility import active_mode
+from .feasibility import LEVELS, active_mode
 
 _bindings = []
-LEVELS = (("VERTEX", "Vertex", ""), ("SEGMENT", "Segment", ""),
-          ("REGION", "Spline", ""), ("WHOLE", "Whole curve", ""))
 
 
 def level(context):
@@ -72,21 +70,32 @@ def distance_squared(point, a, b):
     return (point[0] - a[0] - t * dx) ** 2 + (point[1] - a[1] - t * dy) ** 2
 
 
-def curve_edges(controls, project, depth=0):
-    """de Casteljau subdivision with 0.75-pixel flatness and near-plane breaks."""
+def split_cubic(controls, factor):
+    a, b, c, d = controls
+    ab, bc, cd = a.lerp(b, factor), b.lerp(c, factor), c.lerp(d, factor)
+    abc, bcd = ab.lerp(bc, factor), bc.lerp(cd, factor)
+    middle = abc.lerp(bcd, factor)
+    return (a, ab, abc, middle), (middle, bcd, cd, d)
+
+
+def curve_spans(controls, project, depth=0, low=0.0, high=1.0):
+    """Project a cubic with subpixel flatness and retain its parameter intervals."""
     pixels = [project(point) for point in controls]
     visible = all(point is not None for point in pixels)
     if visible and (depth >= 10 or max(distance_squared(p, pixels[0], pixels[3])
                                       for p in pixels[1:3]) <= 0.75 ** 2):
-        return [(tuple(pixels[0]), tuple(pixels[3]))]
+        yield low, high, tuple(pixels[0]), tuple(pixels[3])
+        return
     if depth >= 10 or all(point is None for point in pixels):
-        return []
-    a, b, c, d = controls
-    ab, bc, cd = (a + b) / 2, (b + c) / 2, (c + d) / 2
-    abc, bcd = (ab + bc) / 2, (bc + cd) / 2
-    middle = (abc + bcd) / 2
-    return (curve_edges((a, ab, abc, middle), project, depth + 1)
-            + curve_edges((middle, bcd, cd, d), project, depth + 1))
+        return
+    left, right = split_cubic(controls, 0.5)
+    middle = (low + high) / 2
+    yield from curve_spans(left, project, depth + 1, low, middle)
+    yield from curve_spans(right, project, depth + 1, middle, high)
+
+
+def curve_edges(controls, project):
+    return [(a, b) for _, _, a, b in curve_spans(controls, project)]
 
 
 def projected_segments(data, matrix, project, *, include_hidden=False):
@@ -221,7 +230,7 @@ def register():
     if keyconfig is not None:
         for name, space in (("Curve", "EMPTY"), ("3D View", "VIEW_3D")):
             keymap = keyconfig.keymaps.new(name=name, space_type=space, region_type="WINDOW")
-            for key, target in (("ONE", "VERTEX"), ("TWO", "SEGMENT"), ("THREE", "REGION"), ("FOUR", "WHOLE")):
+            for key, target in (("ONE", "VERTEX"), ("TWO", "SEGMENT"), ("THREE", "REGION")):
                 item = keymap.keymap_items.new("spline_maker.enter_selection_level", key, "PRESS", head=True)
                 item.properties.target = target
                 _bindings.append((keymap, item))
