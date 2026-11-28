@@ -1,12 +1,12 @@
 # Spline user guide
 
-This guide covers Spline 1.0.0, tested on Blender 5.2.4 LTS for Windows. The ZIP installs as **Spline** and uses the extension ID `spline_maker` for upgrades from earlier builds.
+This guide covers Spline **1.1.0**, accepted by the owner on 2026-11-27. This update was checked on Blender **5.2.5 LTS for Windows**; the 1.0.0 baseline was tested on 5.2.4 LTS. The ZIP installs as **Spline** and uses the extension ID `spline_maker` for upgrades from earlier builds.
 
-Development build **1.1.0** adds Circle Sides/Roll and shaded sidebar boxes. This build is being checked on Blender **5.2.5 LTS for Windows** and is awaiting owner acceptance. The public 1.0.0 package does not include those new controls.
+Version **1.1.0** adds Circle Sides/Roll and shaded sidebar boxes. See the [test results](TEST_PLAN.md#110-circle-controls-sidebar-contrast-and-usage-information--2026-11-27) for the exact validation scope and remaining cases.
 
 ## Install or update
 
-Install the public release from [Blender Extensions](https://extensions.blender.org/add-ons/spline-maker/), or build the current development ZIP, `dist/spline-1.1.0.zip`, from this repository. [Build instructions](BUILD.md#build-and-validate)
+Install the release from [Blender Extensions](https://extensions.blender.org/add-ons/spline-maker/) or [GitHub releases](https://github.com/kielpease/BlenderSpline/releases), or build `dist/spline-1.1.0.zip` from this repository. [Build instructions](BUILD.md#build-and-validate)
 
 In Blender, open **Edit → Preferences → Get Extensions**. From the top-right menu, choose **Install from Disk** and select the ZIP. Enable **Spline** under **Add-ons** if needed. If Blender reports an already-registered class during an upgrade, restart and check the installed version under **Add-ons** before enabling it again.
 

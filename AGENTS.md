@@ -64,7 +64,7 @@ For each change: summarize behavior, files changed, tests, limitations, and a sh
 
 ### Build and resume at home
 
-Work-laptop follow-up (2026-11-27): Blender **5.2.5 LTS** is installed. The **1.1.0 candidate** adds Circle Sides (3–1024, default 32), independent Circle Roll (0°), native shaded sidebar boxes, and supported discovery tags. Keep it separate from the published 1.0.0 release until owner acceptance. Current public usage text is maintained in `docs/EXTENSIONS_DESCRIPTION.md`; see `docs/TEST_PLAN.md` for actual checks and remaining UI cases.
+Work-laptop follow-up (2026-11-27): Blender **5.2.5 LTS** is installed. The owner accepted **1.1.0** and authorized publishing it on GitHub and Blender Extensions. It adds Circle Sides (3–1024, default 32), independent Circle Roll (0°), native shaded sidebar boxes, and supported discovery tags. Preserve the tested ZIP when releasing. Current public usage text is maintained in `docs/EXTENSIONS_DESCRIPTION.md`; see `docs/TEST_PLAN.md` for actual checks, distribution status, and remaining UI cases.
 
 Keep versioned test ZIPs in `dist/` and one owner-approved installer at `stable/spline_maker-stable.zip`. Both folders are Git-ignored. Rebuild after pulling source on another machine and follow the promotion steps in `docs/BUILD.md`. Source is `extension/spline_maker/`; `spline-maker-starter/` is an old starter copy, not the active implementation.
 

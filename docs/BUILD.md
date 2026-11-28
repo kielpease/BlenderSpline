@@ -2,7 +2,7 @@
 
 Spline targets Blender 5.2.4 LTS on Windows. The package includes the GNU GPL license text and declares GPL-3.0-or-later.
 
-The current development candidate is **1.1.0**, with Circle Sides/Roll and shaded sidebar boxes. The published Blender Extensions version remains **1.0.0** until owner acceptance and release. A fresh clone has no local stable installer; inspect its manifest if a stable ZIP exists on your machine. Earlier procedures record the labels and key mappings used for historical checks.
+The owner accepted **1.1.0** on 2026-11-27, with Circle Sides/Roll and shaded sidebar boxes. The exact tested ZIP is the release asset; do not rebuild it during publishing. A fresh clone has no local stable installer; inspect its manifest if a stable ZIP exists on your machine. Earlier procedures record the labels and key mappings used for historical checks.
 
 ## Build and validate
 
@@ -22,14 +22,14 @@ Blender writes the ZIP to `dist/spline-1.1.0.zip`. The extension uses `spline_ma
 
 ## Stable local installer
 
-For **1.1.0** owner testing, use the versioned candidate without replacing stable. In Object Mode select a curve, enable **Make Profile**, and choose **Circle**. Try Sides 3/4/100/128 and Roll 0°/30°/90°, Undo/Redo, and save/reopen. Older profiles expose **Update Profile** before the new controls. Inspect the shaded panels in Object/Edit Mode. See [recorded checks and limits](TEST_PLAN.md#110-circle-controls-sidebar-contrast-and-usage-information--2026-11-27).
+For a **1.1.0** installation check, select a curve in Object Mode, enable **Make Profile**, and choose **Circle**. Try Sides 3/4/100/128 and Roll 0°/30°/90°, Undo/Redo, and save/reopen. Older profiles expose **Update Profile** before the new controls. Inspect the shaded panels in Object/Edit Mode. See [recorded checks and limits](TEST_PLAN.md#110-circle-controls-sidebar-contrast-and-usage-information--2026-11-27).
 
 Keep all versioned test builds in `dist/`. Use `stable/spline_maker-stable.zip` as the single installer for the owner-approved build. Its manifest identifies the version. Both folders are Git-ignored, so a fresh checkout needs a local build of the accepted version before populating `stable/`.
 
 After the owner accepts a candidate, set `$candidate` to its exact ZIP in `dist/` and validate it before replacing the stable copy. The original versioned ZIP stays in `dist/`.
 
 ```powershell
-$candidate = 'dist/spline_maker-0.18.1.zip'
+$candidate = 'dist/spline-1.1.0.zip'
 & $blender --command extension validate $candidate
 if ($LASTEXITCODE -ne 0) { throw 'Candidate validation failed' }
 New-Item -ItemType Directory -Force stable | Out-Null

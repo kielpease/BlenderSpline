@@ -65,7 +65,7 @@ The owner accepted **0.24.0**, which adds live centered Rectangle and Circle pro
 
 Next are base/center/top and inside/center/outside alignment, overlap handling at tight bends and path intersections including T-junctions, and material behavior.
 
-The **1.1.0 candidate** adds owner-requested Circle Sides (3–1024) and independent Roll, shaded sidebar boxes, and expanded usage/discovery information. Background checks pass on Blender 5.2.5 LTS for Windows; owner acceptance is pending. Alignment and intersection behavior remain future work.
+The owner accepted **1.1.0** on 2026-11-27, adding Circle Sides (3–1024) and independent Roll, shaded sidebar boxes, and expanded usage/discovery information. Background and selected viewport checks passed on Blender 5.2.5 LTS for Windows. This is overall owner acceptance, not an itemized report of every test case. Alignment and intersection behavior remain future work.
 
 ## 1.0 release preparation
 

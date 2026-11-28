@@ -35,9 +35,10 @@ With one editable Bézier curve selected in Object Mode, **1**, **2**, and **3**
 
 - Insert and remove vertices, remove segments, break vertices, weld open endpoints, and flatten selected geometry with **Make Planar**.
 - In Object Mode, **Attach Curves** combines selected Bézier objects into the active object while keeping their paths separate. In **3 Spline**, **Detach** moves selected paths into a separate curve object.
-- In Object Mode, enable **Make Profile** and choose a live **Rectangle** or **Circle** sweep. Rectangle provides Height, Width, and Roll; Circle provides Radius. **Curve Resolution** controls smoothness along curved spans.
+- In Object Mode, enable **Make Profile** and choose a live **Rectangle** or **Circle** sweep. Rectangle provides Height, Width, and Roll; Circle provides **Radius**, **Sides** (3–1024, default 32), and its own **Roll** (default 0°). Use 3 or 4 sides for polygonal profiles or 100/128 and higher for a rounder sweep. Roll rotates the cross-section about the path. **Curve Resolution** controls smoothness along curved spans independently of Sides.
+- On an older profile, click **Update Profile** to add the new controls while keeping the existing dimensions and Rectangle Roll. The source remains editable, and the update takes one Undo step.
 - Save normally as a `.blend`. The source curves remain native editable Bézier geometry, including after disabling the extension.
 
 Spline edits one all-Bézier curve object at a time. Tight or intersecting profile sweeps can overlap. See the [full user guide and current development notes](https://github.com/kielpease/BlenderSpline/blob/main/docs/USER_GUIDE.md) and [feature demos](https://github.com/kielpease/BlenderSpline#feature-demos).
 
-By **Pease Technology**. Licensed under **GPL-3.0-or-later**. Published version 1.0.0 was tested on Blender **5.2.4 LTS for Windows** with Default and Industry Compatible keymaps. Compatibility outside the recorded test environments is unverified.
+By **Pease Technology**. Licensed under **GPL-3.0-or-later**. Version **1.1.0** was accepted by the owner and checked on Blender **5.2.5 LTS for Windows**. The 1.0.0 baseline was tested on 5.2.4 LTS with Default and Industry Compatible keymaps. See the [validation records](https://github.com/kielpease/BlenderSpline/blob/main/docs/TEST_PLAN.md) for exact coverage; compatibility outside the recorded environments is unverified.

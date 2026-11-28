@@ -2,9 +2,9 @@
 
 Spline is a simple and classic way to draw and edit splines in Blender. Draw native Bézier curves with straight edges and smooth arcs, then edit vertices, segments, individual splines, or the whole curve in the 3D Viewport.
 
-**Version 1.0.0** · By **Pease Technology** · Tested on Blender 5.2.4 LTS for Windows with the Industry Compatible and Default keymaps.
+**Version 1.1.0** · By **Pease Technology** · Owner accepted on 2026-11-27. This update was checked on **Blender 5.2.5 LTS for Windows**; the 1.0.0 baseline was tested on 5.2.4 LTS with Default and Industry Compatible keymaps. [Validation scope](docs/TEST_PLAN.md#110-circle-controls-sidebar-contrast-and-usage-information--2026-11-27)
 
-The next development build is **1.1.0**: Circle profiles gain **Sides** (3–1024, default 32) and their own **Roll** (default 0°), and the sidebar uses shaded boxes. Automated checks pass on Blender 5.2.5 LTS for Windows; owner acceptance is pending before public release.
+**New in 1.1.0:** Circle profiles gain **Sides** (3–1024, default 32) and their own **Roll** (default 0°), and the sidebar uses darker shaded boxes. On older profiles, click **Update Profile** to enable the new controls while keeping existing dimensions. [Release notes](CHANGELOG.md)
 
 ![A Blender viewport demo showing a Bézier outline drawn from the Add menu, then edited by moving a segment and adjusting a handle](docs/images/spline-demo.gif)
 
@@ -44,7 +44,7 @@ With one supported curve selected in Object Mode, **1**, **2**, or **3** also en
 - Direct handle editing, a right-click vertex-type menu, and separate selection levels for vertices, segments, splines, and all geometry.
 - Move, Rotate, and Scale gizmos with world-axis constraints, Shift snapping, and editable world coordinates in the sidebar.
 - Insert, remove, break, and weld vertices, or attach, detach, and flatten splines.
-- Sweep a live rectangle or circle along a spline. Adjust curve resolution, rectangle width, height and roll, or circle radius.
+- Sweep a live rectangle or circle along a spline. Adjust curve resolution, rectangle width/height/roll, or circle radius/sides/roll.
 - When the viewport sidebar is open, selecting a Bézier curve shows **Spline**. Selecting or adding a mesh from there returns to Blender’s **Item** tab.
 - Native Undo/Redo for completed gestures and native Bézier geometry that remains editable after saving and reopening the project.
 
