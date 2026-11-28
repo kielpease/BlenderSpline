@@ -322,6 +322,12 @@ Isolated viewport checks passed on Blender 5.2.4 LTS for Windows with Industry C
 - **Owner accepted 1.1.0 on 2026-11-27**, reporting that it appears to work well and requesting GitHub/Blender Extensions publication with updated descriptions. This is overall acceptance, not a separate result for every checklist item. New controls have not been checked on Blender 5.2.4. Industry Compatible mouse entry, high-side-count UI input, alternate themes, physical Redo shortcut, and opening a real owner file with an old profile remain unverified. Distribution results are recorded below after publication.
 - Owner check: install the candidate in a fresh profile; select a curve → **Make Profile → Circle**; try Sides 3/4/100/128 and Roll 0°/30°/90°; check Undo/Redo and save/reopen. Switch Rectangle/Circle to check independent rolls, use **Update Profile** on an older profile, and inspect sidebar contrast in Object and Edit Mode. Confirm acceptance before publishing.
 
+#### 1.1.0 distribution
+
+- [GitHub release v1.1.0](https://github.com/kielpease/BlenderSpline/releases/tag/v1.1.0) is published with `docs/releases/1.1.0.md` as its description and the owner-tested `spline-1.1.0.zip` attached. GitHub reports the same SHA256 recorded above. Tag `v1.1.0` points to release-preparation commit `cbae69d`.
+- The same ZIP was copied to `stable/spline_maker-stable.zip`; it was not rebuilt. The [release-tool CI check](https://github.com/kielpease/BlenderSpline/actions/runs/46096801073) passed. The [publishing workflow](https://github.com/kielpease/BlenderSpline/actions/runs/46097060520) downloaded and verified the release asset successfully, then failed at upload because `BLENDER_EXTENSIONS_TOKEN` is not configured.
+- Manual Blender Extensions fallback is prepared with the verified ZIP selected. Submission is waiting for the owner's confirmation of the upload form's required Terms of Service acceptance. Platform publication, live tags/updated About text for 1.1.0, and an existing-installation update through Blender's official repository are not yet verified.
+
 Public distribution also follows [Publishing Spline updates](RELEASING.md). Record the exact ZIP SHA256, owner acceptance, GitHub release/tag, platform upload/publication status, and an existing-installation update check in Blender for each release.
 
 ### Release process tooling — 2026-11-27
