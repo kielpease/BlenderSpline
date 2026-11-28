@@ -66,6 +66,8 @@ For each change: summarize behavior, files changed, tests, limitations, and a sh
 
 Work-laptop follow-up (2026-11-27): Blender **5.2.5 LTS** is installed. The owner accepted **1.1.0** and authorized publishing it on GitHub and Blender Extensions. It adds Circle Sides (3–1024, default 32), independent Circle Roll (0°), native shaded sidebar boxes, and supported discovery tags. Preserve the tested ZIP when releasing. Current public usage text is maintained in `docs/EXTENSIONS_DESCRIPTION.md`; see `docs/TEST_PLAN.md` for actual checks, distribution status, and remaining UI cases.
 
+**1.1.0 is published on GitHub and Approved on Blender Extensions.** Both sites distribute the same owner-tested ZIP, also promoted to the local stable installer. Release notes, About text, and Add Curve/Modeling/3D View tags are live. Public download hash and the official Windows 5.2.5 update listing were verified. This release used the manual upload fallback because the GitHub `BLENDER_EXTENSIONS_TOKEN` secret is still absent; automatic uploads require that one-time setup.
+
 Keep versioned test ZIPs in `dist/` and one owner-approved installer at `stable/spline_maker-stable.zip`. Both folders are Git-ignored. Rebuild after pulling source on another machine and follow the promotion steps in `docs/BUILD.md`. Source is `extension/spline_maker/`; `spline-maker-starter/` is an old starter copy, not the active implementation.
 
 From the repository root, set `$blender` to the local Blender 5.2.4 executable and run:
