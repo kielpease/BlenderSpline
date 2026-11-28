@@ -1,0 +1,60 @@
+name: Publish Blender Extensions update
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: blender-extensions-publish
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    if: ${{ !github.event.release.prerelease && !github.event.release.draft }}
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          persist-credentials: false
+      - name: Download and verify the tested release asset
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:RELEASE_TAG -cnotmatch '^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$') {
+            throw 'Expected a stable vX.Y.Z release tag.'
+          }
+          $version = $env:RELEASE_TAG.Substring(1)
+          gh release download $env:RELEASE_TAG --pattern "spline-$version.zip" --dir dist
+          if ($LASTEXITCODE -ne 0) { throw 'Tested release ZIP not found.' }
+          $verified = ./scripts/Check-Release.ps1 -Tag $env:RELEASE_TAG
+          "RELEASE_ARCHIVE=$($verified.Archive)" >> $env:GITHUB_ENV
+          "Verified SHA256: $($verified.SHA256)" >> $env:GITHUB_STEP_SUMMARY
+          $release = (Get-Content $env:GITHUB_EVENT_PATH -Raw | ConvertFrom-Json).release
+          if ([string]::IsNullOrWhiteSpace($release.body)) { throw 'Release notes are required.' }
+          [IO.File]::WriteAllText((Join-Path $PWD 'release-notes.md'), $release.body, [Text.UTF8Encoding]::new($false))
+      - name: Upload update to Blender Extensions
+        shell: pwsh
+        env:
+          BLENDER_EXTENSIONS_TOKEN: ${{ secrets.BLENDER_EXTENSIONS_TOKEN }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ([string]::IsNullOrWhiteSpace($env:BLENDER_EXTENSIONS_TOKEN)) {
+            throw 'Configure the BLENDER_EXTENSIONS_TOKEN repository secret; see docs/RELEASING.md.'
+          }
+          # Manifest ID uses underscores; the public page slug uses hyphens.
+          curl.exe --fail-with-body --silent --show-error --connect-timeout 30 --max-time 180 `
+            --request POST 'https://extensions.blender.org/api/v1/extensions/spline_maker/versions/upload/' `
+            --header "Authorization:bearer $env:BLENDER_EXTENSIONS_TOKEN" `
+            --form "version_file=@$env:RELEASE_ARCHIVE" `
+            --form 'release_notes=<release-notes.md'
+          if ($LASTEXITCODE -ne 0) { throw 'Blender Extensions upload failed. Inspect the listing before retrying.' }
+          'Upload accepted. Verify version/status at https://extensions.blender.org/add-ons/spline-maker/versions/ before marking the release complete.' >> $env:GITHUB_STEP_SUMMARY

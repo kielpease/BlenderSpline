@@ -2,9 +2,11 @@
 
 Spline targets Blender 5.2.4 LTS on Windows. The package includes the GNU GPL license text and declares GPL-3.0-or-later.
 
-Build **1.0.0** for the Spline name and current drawing, editing, and profile tools. The local stable ZIP contains **0.18.1**. Earlier procedures record the labels and key mappings used for historical checks.
+The current development candidate is **1.1.0**, with Circle Sides/Roll and shaded sidebar boxes. The published Blender Extensions version remains **1.0.0** until owner acceptance and release. A fresh clone has no local stable installer; inspect its manifest if a stable ZIP exists on your machine. Earlier procedures record the labels and key mappings used for historical checks.
 
 ## Build and validate
+
+For public updates, follow [Publishing Spline updates](RELEASING.md). `scripts/Prepare-Release.ps1` runs version-aware build, validation, and isolated background checks; stable GitHub releases upload their tested ZIP to the existing Blender Extensions listing.
 
 Run from the project folder in PowerShell. Set `$blender` to your installed executable.
 
@@ -12,13 +14,15 @@ Run from the project folder in PowerShell. Set `$blender` to your installed exec
 $blender = 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe'
 New-Item -ItemType Directory -Force dist | Out-Null
 & $blender --command extension validate extension/spline_maker
-& $blender --command extension build --source-dir extension/spline_maker --output-filepath dist/spline-1.0.0.zip
-& $blender --command extension validate dist/spline-1.0.0.zip
+& $blender --command extension build --source-dir extension/spline_maker --output-filepath dist/spline-1.1.0.zip
+& $blender --command extension validate dist/spline-1.1.0.zip
 ```
 
-Blender writes the ZIP to `dist/spline-1.0.0.zip`. The extension uses `spline_maker` internally so Blender can upgrade earlier builds in place. [Blender extension CLI documentation](https://docs.blender.org/manual/en/5.2/advanced/command_line/extension_arguments.html)
+Blender writes the ZIP to `dist/spline-1.1.0.zip`. The extension uses `spline_maker` internally so Blender can upgrade earlier builds in place. [Blender extension CLI documentation](https://docs.blender.org/manual/en/5.2/advanced/command_line/extension_arguments.html)
 
 ## Stable local installer
+
+For **1.1.0** owner testing, use the versioned candidate without replacing stable. In Object Mode select a curve, enable **Make Profile**, and choose **Circle**. Try Sides 3/4/100/128 and Roll 0°/30°/90°, Undo/Redo, and save/reopen. Older profiles expose **Update Profile** before the new controls. Inspect the shaded panels in Object/Edit Mode. See [recorded checks and limits](TEST_PLAN.md#110-circle-controls-sidebar-contrast-and-usage-information--2026-11-27).
 
 Keep all versioned test builds in `dist/`. Use `stable/spline_maker-stable.zip` as the single installer for the owner-approved build. Its manifest identifies the version. Both folders are Git-ignored, so a fresh checkout needs a local build of the accepted version before populating `stable/`.
 
@@ -41,7 +45,7 @@ $previousResources = $env:BLENDER_USER_RESOURCES
 try {
     $testProfile = Join-Path (Resolve-Path dist) ([guid]::NewGuid().ToString())
     $env:BLENDER_USER_RESOURCES = (New-Item -ItemType Directory $testProfile).FullName
-    & $blender --background --factory-startup --python-exit-code 1 --python tests/blender/smoke_registration.py -- dist/spline-1.0.0.zip
+    & $blender --background --factory-startup --python-exit-code 1 --python tests/blender/smoke_registration.py -- dist/spline-1.1.0.zip
 } finally {
     $env:BLENDER_USER_RESOURCES = $previousResources
 }

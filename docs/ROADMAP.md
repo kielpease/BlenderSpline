@@ -65,12 +65,15 @@ The owner accepted **0.24.0**, which adds live centered Rectangle and Circle pro
 
 Next are base/center/top and inside/center/outside alignment, overlap handling at tight bends and path intersections including T-junctions, and material behavior.
 
+The **1.1.0 candidate** adds owner-requested Circle Sides (3–1024) and independent Roll, shaded sidebar boxes, and expanded usage/discovery information. Background checks pass on Blender 5.2.5 LTS for Windows; owner acceptance is pending. Alignment and intersection behavior remain future work.
+
 ## 1.0 release preparation
 
 Version 1.0.0 brings together Bézier drawing, topology editing, and live profiles under the name **Spline**. Pease Technology licenses the extension under GPL-3.0-or-later. [User guide](USER_GUIDE.md)
 
 - Build and verify `dist/spline-1.0.0.zip` in clean Blender profiles with the Default and Industry Compatible keymaps. [Release gate](TEST_PLAN.md#release-gate)
 - Review the verified ZIP in the owner’s Blender setup before publishing the GitHub release.
+- For subsequent public updates, follow [Publishing Spline updates](RELEASING.md): publish the tested version to the existing Blender Extensions listing and verify update delivery in Blender.
 
 ## Suggested GitHub labels
 

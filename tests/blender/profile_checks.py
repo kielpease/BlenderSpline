@@ -142,6 +142,83 @@ def check_units_and_attachment(profile):
         units.system, units.scale_length = old_system, old_scale
 
 
+def check_circle_controls(profile):
+    obj = line("Circle sides and roll")
+    original = geometry(obj)
+    assert bpy.ops.spline_maker.toggle_profile() == {"FINISHED"}
+    modifier = profile.profile_modifier(obj)
+    ins = lambda field: profile.profile_input(modifier, field)
+    assert ins("Sides").value == 32 and ins("Circle Roll").value == 0
+    assert ins("Circle Roll").bl_rna.properties["value"].unit == "ROTATION"
+    ins("Shape").value = "Circle"
+    ins("Radius").value = 0.75
+    for sides in (3, 4, 32, 100, 128, 1024):
+        ins("Sides").value = sides
+        obj.update_tag()
+        coords, faces = evaluated_mesh(obj)
+        assert len(coords) == 2 * sides and len(faces) == sides + 2, (sides, len(coords), len(faces))
+        assert all(abs(hypot(p.y, p.z) - 0.75) < 1e-5 for p in coords)
+        assert_closed_surface(faces)
+    ins("Sides").value = 3
+    ins("Roll").value = 0.7  # Rectangle roll must not affect Circle orientation.
+    obj.update_tag()
+    before, _ = evaluated_mesh(obj)
+    ins("Circle Roll").value = radians(30)
+    obj.update_tag()
+    after, _ = evaluated_mesh(obj)
+    for a, b in zip(before, after):
+        assert abs(a.x - b.x) < 1e-6
+        # Curve-to-Mesh transports the profile's local XY into the path frame.
+        assert abs(a.y * b.y + a.z * b.z - 0.75 ** 2 * cos(radians(30))) < 1e-5
+    assert geometry(obj) == original and obj.type == "CURVE"
+    assert bpy.ops.spline_maker.toggle_profile() == {"FINISHED"}
+    assert bpy.ops.spline_maker.toggle_profile() == {"FINISHED"}
+    assert ins("Sides").value == 3 and abs(ins("Circle Roll").value - radians(30)) < 1e-6
+    assert abs(ins("Roll").value - 0.7) < 1e-6
+
+
+def check_profile_upgrade(profile):
+    """Reconstruct the previous fixed-resolution Circle graph on real Blender nodes."""
+    for version in (1, 2):
+        obj = line(f"Legacy profile v{version}")
+        name = obj.name
+        assert bpy.ops.spline_maker.toggle_profile() == {"FINISHED"}
+        modifier = profile.profile_modifier(obj)
+        legacy = modifier.node_group.copy()
+        legacy[profile._GROUP_KEY] = version
+        circle = next(node for node in legacy.nodes if node.bl_idname == "GeometryNodeCurvePrimitiveCircle")
+        sweep = next(node for node in legacy.nodes if node.bl_idname == "GeometryNodeCurveToMesh")
+        legacy.links.new(circle.outputs["Curve"], sweep.inputs["Profile Curve"])
+        for field in ("Sides", "Circle Roll"):
+            legacy.interface.remove(legacy.interface.items_tree[field])
+        circle.inputs["Resolution"].default_value = 32
+        modifier.node_group = legacy
+        for field, value in (("Shape", "Circle"), ("Height", 2.5), ("Width", 0.4),
+                             ("Radius", 0.625), ("Roll", 0.8)):
+            profile.profile_input(modifier, field).value = value
+        obj.update_tag()
+        before, _ = evaluated_mesh(obj)
+        assert profile.is_profile_modifier(modifier) and bpy.ops.spline_maker.update_profile.poll()
+        assert bpy.ops.ed.undo_push(message="Before profile upgrade") == {"FINISHED"}
+        assert bpy.ops.spline_maker.update_profile("EXEC_DEFAULT", True) == {"FINISHED"}
+        modifier = profile.profile_modifier(obj)
+        after, _ = evaluated_mesh(obj)
+        assert len(before) == len(after) and all((a - b).length < 1e-5 for a, b in zip(before, after))
+        for field, value in (("Shape", "Circle"), ("Height", 2.5), ("Width", 0.4),
+                             ("Radius", 0.625), ("Roll", 0.8)):
+            actual = profile.profile_input(modifier, field).value
+            assert actual == value if isinstance(value, str) else abs(actual - value) < 1e-6
+        assert profile.profile_input(modifier, "Sides").value == 32
+        assert profile.profile_input(modifier, "Circle Roll").value == 0
+        assert not bpy.ops.spline_maker.update_profile.poll()
+        assert bpy.ops.ed.undo() == {"FINISHED"}
+        modifier = profile.profile_modifier(bpy.data.objects[name])
+        assert modifier.node_group.get(profile._GROUP_KEY) == version
+        assert bpy.ops.ed.redo() == {"FINISHED"}
+        modifier = profile.profile_modifier(bpy.data.objects[name])
+        assert modifier.node_group.get(profile._GROUP_KEY) == profile._GROUP_VERSION
+
+
 def check_resolution():
     obj = line("Profile resolution")
     a, b = obj.data.splines[0].bezier_points
@@ -258,10 +335,13 @@ def check_remembered_dimensions(profile):
 def run(module):
     with viewport():
         check_bounds(module.profile)
+        check_circle_controls(module.profile)
         check_units_and_attachment(module.profile)
         check_resolution()
         check_miters()
         check_remembered_dimensions(module.profile)
+        check_profile_upgrade(module.profile)
     print("M5 live rectangle, roll, circle, Imperial dimensions, and source path editing passed")
     print("M5 native curve resolution and independent remembered rectangle dimensions passed")
     print("M5 mitered inside/outside bends, closed seams, and bounded sharp turns passed")
+    print("Circle Sides 3-1024, independent Roll, profile upgrade and upgrade Undo/Redo passed")

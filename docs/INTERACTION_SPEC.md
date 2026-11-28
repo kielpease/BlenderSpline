@@ -265,3 +265,11 @@ When the 3D Viewport sidebar is open, selecting an editable Bézier curve or ent
 ### Version 1.0 labels
 
 The extension and sidebar tab are named **Spline**. The panel in Curve Edit Mode reads **Edit Spline**. The extension ID and the workflow above carry forward from earlier builds.
+
+### Circle profile controls and sidebar contrast — 1.1.0 candidate
+
+Circle profiles expose Radius, Sides (integer 3–1024, default 32), and Roll (angle, default 0°). Sides controls cross-section edges independently of the native path Curve Resolution. Circle Roll rotates the cross-section about the path and is stored independently of Rectangle Roll. These values belong to the per-object modifier and persist in the `.blend` file. Source Bézier geometry is unchanged.
+
+Existing version 1/2 profile graphs remain recognized. The visible Update Profile action upgrades them in one Undo step, preserves their existing inputs, and initializes Circle to 32 sides and 0° roll. No automatic data migration runs on opening a file or enabling the extension.
+
+Object Mode and Edit Mode Spline panels wrap their controls in Blender-native shaded boxes. This adds separation using the active theme's box color; it does not modify global theme colors or claim a fixed shade under every theme.

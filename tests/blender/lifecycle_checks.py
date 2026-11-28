@@ -106,6 +106,8 @@ def run(module):
         assert bpy.ops.spline_maker.set_profile_dimension(dimension="Width", value=0.625) == {"FINISHED"}
         module.profile.profile_input(modifier, "Shape").value = "Circle"
         module.profile.profile_input(modifier, "Radius").value = 0.625
+        module.profile.profile_input(modifier, "Sides").value = 128
+        module.profile.profile_input(modifier, "Circle Roll").value = 0.35
 
     context.window.scene = other_scene
     with viewport():
@@ -135,6 +137,8 @@ def run(module):
     assert modifier.show_viewport and modifier.show_render
     assert module.profile.profile_input(modifier, "Shape").value == "Circle"
     assert module.profile.profile_input(modifier, "Radius").value == 0.625
+    assert module.profile.profile_input(modifier, "Sides").value == 128
+    assert abs(module.profile.profile_input(modifier, "Circle Roll").value - 0.35) < 1e-6
     assert not module.make_planar.has_drawing_plane(bpy.data.objects["Saved closed curve"].data)
 
     manager = context.window_manager

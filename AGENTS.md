@@ -28,6 +28,8 @@ Design reliable undo boundaries; do not assume Blender automatically records eac
 
 ## Validation and reporting
 
+- Public updates must follow `docs/RELEASING.md` and update `CHANGELOG.md`. Preserve extension ID `spline_maker` and publish new versions to the existing listing at https://extensions.blender.org/add-ons/spline-maker/. Publishing an owner-accepted stable GitHub release uploads its tested ZIP through the release workflow; ordinary pushes do not. Record upload/publication and Blender update verification separately from build/UI acceptance. Keep API tokens only in GitHub Secrets.
+
 Run focused math tests and Blender background smoke tests when relevant. Mouse interaction, gizmos, picking, and navigation require real Blender UI testing. Never equate syntax checks or mocks with UI verification. Report exact Blender version, checks run, and anything untested.
 
 For each change: summarize behavior, files changed, tests, limitations, and a short user test procedure. Update relevant docs and changelog when present. Do not increase scope or make unsupported compatibility claims to satisfy a milestone.
@@ -62,14 +64,16 @@ For each change: summarize behavior, files changed, tests, limitations, and a sh
 
 ### Build and resume at home
 
+Work-laptop follow-up (2026-11-27): Blender **5.2.5 LTS** is installed. The **1.1.0 candidate** adds Circle Sides (3–1024, default 32), independent Circle Roll (0°), native shaded sidebar boxes, and supported discovery tags. Keep it separate from the published 1.0.0 release until owner acceptance. Current public usage text is maintained in `docs/EXTENSIONS_DESCRIPTION.md`; see `docs/TEST_PLAN.md` for actual checks and remaining UI cases.
+
 Keep versioned test ZIPs in `dist/` and one owner-approved installer at `stable/spline_maker-stable.zip`. Both folders are Git-ignored. Rebuild after pulling source on another machine and follow the promotion steps in `docs/BUILD.md`. Source is `extension/spline_maker/`; `spline-maker-starter/` is an old starter copy, not the active implementation.
 
 From the repository root, set `$blender` to the local Blender 5.2.4 executable and run:
 
 ```powershell
 New-Item -ItemType Directory -Force dist | Out-Null
-& $blender --command extension build --source-dir extension/spline_maker --output-filepath dist/spline-1.0.0.zip
-& $blender --command extension validate dist/spline-1.0.0.zip
+& $blender --command extension build --source-dir extension/spline_maker --output-filepath dist/spline-1.1.0.zip
+& $blender --command extension validate dist/spline-1.1.0.zip
 ```
 
 Use the isolated-profile smoke-test command in `docs/BUILD.md`; it sets/restores `BLENDER_USER_RESOURCES` and installs into a fresh directory under `dist`, protecting the normal Blender profile. The entry point is `tests/blender/smoke_registration.py`, which runs the segment, region/spline, controls, Whole Move, transform and entry regression modules. Disable the previous build and restart Blender before installing a new ZIP for hands-on testing.

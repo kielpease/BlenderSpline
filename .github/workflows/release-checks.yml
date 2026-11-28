@@ -1,0 +1,17 @@
+name: Check release tooling
+on:
+  push:
+    paths: ['scripts/**', 'tests/release_checks.ps1', '.github/workflows/**', 'extension/spline_maker/**', 'LICENSE']
+  pull_request:
+    paths: ['scripts/**', 'tests/release_checks.ps1', '.github/workflows/**', 'extension/spline_maker/**', 'LICENSE']
+permissions:
+  contents: read
+jobs:
+  release-checks:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test release asset checks
+        shell: pwsh
+        run: ./tests/release_checks.ps1

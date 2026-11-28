@@ -12,7 +12,8 @@ from . import profile_corners
 
 _GROUP_NAME = "Spline Profile"
 _GROUP_KEY = "spline_maker_profile"
-_GROUP_VERSION = 2
+_GROUP_VERSION = 3
+_SUPPORTED_GROUP_VERSIONS = {1, 2, _GROUP_VERSION}
 _MIN_DIMENSION = 1e-6
 _RECTANGLE_DIMENSIONS = {
     "Height": "spline_maker_profile_height",
@@ -22,7 +23,7 @@ _RECTANGLE_DIMENSIONS = {
 
 def is_profile_modifier(modifier):
     return (modifier.type == "NODES" and modifier.node_group is not None
-            and modifier.node_group.get(_GROUP_KEY) in {1, _GROUP_VERSION})
+            and modifier.node_group.get(_GROUP_KEY) in _SUPPORTED_GROUP_VERSIONS)
 
 
 def profile_modifier(obj):
@@ -55,6 +56,15 @@ def profile_group():
     roll = interface.new_socket(name="Roll", in_out="INPUT", socket_type="NodeSocketFloat")
     roll.subtype = "ANGLE"
     roll.default_value = 0.0
+    sides = interface.new_socket(name="Sides", in_out="INPUT", socket_type="NodeSocketInt")
+    sides.description = "Number of edges around the Circle cross-section"
+    sides.min_value = 3
+    sides.max_value = 1024
+    sides.default_value = 32
+    circle_roll = interface.new_socket(name="Circle Roll", in_out="INPUT", socket_type="NodeSocketFloat")
+    circle_roll.description = "Rotate the Circle cross-section around the path"
+    circle_roll.subtype = "ANGLE"
+    circle_roll.default_value = 0.0
 
     def add_node(node_type, x, y):
         node = group.nodes.new(node_type)
@@ -74,6 +84,9 @@ def profile_group():
     combine = add_node("ShaderNodeCombineXYZ", 245, -175)
     rotation = add_node("FunctionNodeEulerToRotation", 465, -175)
     transform = add_node("GeometryNodeTransform", 690, 105)
+    circle_combine = add_node("ShaderNodeCombineXYZ", 245, -700)
+    circle_rotation = add_node("FunctionNodeEulerToRotation", 465, -700)
+    circle_transform = add_node("GeometryNodeTransform", 690, -700)
     miter = add_node("GeometryNodeGroup", 900, 140)
     miter.node_tree = profile_corners.miter_group()
     menu = add_node("GeometryNodeMenuSwitch", 1320, 100)
@@ -96,6 +109,11 @@ def profile_group():
     for name in ("Height", "Width"):
         link(inputs.outputs[name], rectangle.inputs[name])
     link(inputs.outputs["Radius"], circle.inputs["Radius"])
+    link(inputs.outputs["Sides"], circle.inputs["Resolution"])
+    link(inputs.outputs["Circle Roll"], circle_combine.inputs["Z"])
+    link(circle_combine.outputs["Vector"], circle_rotation.inputs["Euler"])
+    link(circle_rotation.outputs["Rotation"], circle_transform.inputs["Rotation"])
+    link(circle.outputs["Curve"], circle_transform.inputs["Geometry"])
     link(inputs.outputs["Roll"], combine.inputs["Z"])
     link(combine.outputs["Vector"], rotation.inputs["Euler"])
     link(rotation.outputs["Rotation"], transform.inputs["Rotation"])
@@ -105,7 +123,7 @@ def profile_group():
     link(inputs.outputs["Curve"], miter.inputs["Curve"])
     link(transform.outputs["Geometry"], miter.inputs["Profile"])
     link(miter.outputs["Mesh"], menu.inputs["Rectangle"])
-    link(circle.outputs["Curve"], sweep.inputs["Profile Curve"])
+    link(circle_transform.outputs["Geometry"], sweep.inputs["Profile Curve"])
     link(normal.outputs["Curve"], sweep.inputs["Curve"])
     link(sweep.outputs["Mesh"], menu.inputs["Circle"])
     # Keep rectangular corners and end caps crisp without faceting round walls.
@@ -113,7 +131,7 @@ def profile_group():
     link(sharp.outputs["Result"], shading.inputs["Selection"])
     link(menu.outputs["Output"], shading.inputs["Geometry"])
     link(shading.outputs["Geometry"], outputs.inputs["Geometry"])
-    legacy = next((item for item in local if item.get(_GROUP_KEY) == 1), None)
+    legacy = next((item for version in (2, 1) for item in local if item.get(_GROUP_KEY) == version), None)
     if legacy is not None:
         for key in _RECTANGLE_DIMENSIONS.values():
             if key in legacy:
@@ -216,8 +234,8 @@ class SPLINE_MAKER_OT_set_profile_dimension(bpy.types.Operator):
 
 class SPLINE_MAKER_OT_update_profile(bpy.types.Operator):
     bl_idname = "spline_maker.update_profile"
-    bl_label = "Update Profile Corners"
-    bl_description = "Apply the current corner joins to this profile and keep its dimensions"
+    bl_label = "Update Profile"
+    bl_description = "Add current profile controls and corner joins while preserving existing dimensions"
     bl_options = {"UNDO", "INTERNAL"}
 
     @classmethod
@@ -225,7 +243,8 @@ class SPLINE_MAKER_OT_update_profile(bpy.types.Operator):
         if not SPLINE_MAKER_OT_toggle_profile.poll(context):
             return False
         modifier = profile_modifier(context.active_object)
-        return modifier is not None and modifier.node_group.get(_GROUP_KEY) == 1
+        return (modifier is not None
+                and modifier.node_group.get(_GROUP_KEY) in _SUPPORTED_GROUP_VERSIONS - {_GROUP_VERSION})
 
     def execute(self, context):
         obj = context.active_object
@@ -252,7 +271,8 @@ def draw_profile_settings(layout, context):
     toggle.alignment = "LEFT"
     toggle.operator("spline_maker.toggle_profile",
                     icon="CHECKBOX_HLT" if enabled else "CHECKBOX_DEHLT", emboss=False)
-    if modifier is not None and modifier.node_group.get(_GROUP_KEY) == 1:
+    current = modifier is not None and modifier.node_group.get(_GROUP_KEY) == _GROUP_VERSION
+    if modifier is not None and not current:
         layout.operator("spline_maker.update_profile")
     if enabled:
         controls = layout.column(align=True)
@@ -272,6 +292,11 @@ def draw_profile_settings(layout, context):
             controls.prop(profile_input(modifier, "Roll"), "value", text="Roll")
         else:
             controls.prop(profile_input(modifier, "Radius"), "value", text="Radius")
+            if current:
+                controls.prop(profile_input(modifier, "Sides"), "value", text="Sides")
+                controls.prop(profile_input(modifier, "Circle Roll"), "value", text="Roll")
+            else:
+                controls.label(text="Update Profile for Sides and Roll", icon="INFO")
 
 
 CLASSES = (SPLINE_MAKER_OT_toggle_profile, SPLINE_MAKER_OT_set_profile_dimension, SPLINE_MAKER_OT_update_profile)

@@ -359,7 +359,7 @@ class VIEW3D_PT_spline_maker_probe(bpy.types.Panel):
     def draw(self, context):
         from .display import draw_settings
 
-        layout = self.layout
+        layout = self.layout.box()
         # Sidebar clicks must run in the viewport's WINDOW region, just like
         # shortcuts and gizmos. Execute these discrete actions without invoking
         # an interactive transform.
@@ -455,7 +455,7 @@ class VIEW3D_PT_spline_maker_edit_info(bpy.types.Panel):
         return SPLINE_MAKER_OT_switch_tangent_tool.poll(context)
 
     def draw(self, context):
-        layout = self.layout
+        layout = self.layout.box()
         from .segment_selection import level
         current_level = level(context)
         mode = active_mode(context)

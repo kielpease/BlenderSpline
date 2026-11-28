@@ -100,18 +100,19 @@ class VIEW3D_PT_spline_maker(bpy.types.Panel):
     bl_context = "objectmode"
 
     def draw(self, context):
-        row = self.layout.row()
+        layout = self.layout.box()
+        row = layout.row()
         row.operator_context = "INVOKE_REGION_WIN"
         row.operator(SPLINE_MAKER_OT_draw_spline.bl_idname)
-        row = self.layout.row()
+        row = layout.row()
         row.operator_context = "EXEC_REGION_WIN"
         label = "6  Edit Active" if len(context.selected_objects) > 1 else "6  Edit Spline"
         row.operator("spline_maker.enter_edit", text=label)
         row.operator("spline_maker.attach_curves")
         from .profile import draw_profile_settings
-        draw_profile_settings(self.layout, context)
+        draw_profile_settings(layout, context)
         from .display import draw_settings
-        draw_settings(self.layout, context)
+        draw_settings(layout, context)
 
 
 def draw_curve_add_menu(self, context):

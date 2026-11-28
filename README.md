@@ -4,13 +4,39 @@ Spline is a simple and classic way to draw and edit splines in Blender. Draw nat
 
 **Version 1.0.0** · By **Pease Technology** · Tested on Blender 5.2.4 LTS for Windows with the Industry Compatible and Default keymaps.
 
+The next development build is **1.1.0**: Circle profiles gain **Sides** (3–1024, default 32) and their own **Roll** (default 0°), and the sidebar uses shaded boxes. Automated checks pass on Blender 5.2.5 LTS for Windows; owner acceptance is pending before public release.
+
 ![A Blender viewport demo showing a Bézier outline drawn from the Add menu, then edited by moving a segment and adjusting a handle](docs/images/spline-demo.gif)
 
 ## Quick start
 
+Install the published release from [Blender Extensions](https://extensions.blender.org/add-ons/spline-maker/). For development builds, follow the steps below. Maintainers: follow the [update and publishing process](docs/RELEASING.md) for every public release.
+
 1. Build the ZIP from this checkout. In Blender, go to **Edit → Preferences → Get Extensions** and choose **Install from Disk** from the top-right menu. [Build instructions](docs/BUILD.md#build-and-validate)
 2. In Object Mode, choose **Add → Curve → Draw Spline** or open the **Spline** tab in the viewport sidebar with **N** (Default) or **Ctrl+]** (Industry Compatible). Click to place corners or drag to pull linked handles. Right-click to finish an open spline. Click the first point to close it after placing at least three vertices.
 3. Select a Bézier curve and press **6** to edit. Use **1–3** or the **All** sidebar button for the selection level and **Q/W/E/R** for Select, Move, Rotate, or Scale. Press **4** or **Enter** to return to Object Mode.
+
+## Drawing and editing controls
+
+Keep the mouse over the **3D Viewport** when using shortcuts. Start in **Object Mode → Add → Curve → Draw Spline**, or open the **Spline** sidebar tab and click **Draw Spline**. Click for a corner; click-drag for a Bézier vertex. Right-click or Enter finishes an open path; click the first vertex to close a path with at least three vertices. Esc cancels drawing. Shift constrains new segments to 45° steps; Backspace removes the last preview point.
+
+Select a Bézier curve, then use the controls below. The sidebar buttons provide the same actions.
+
+| Key / button | Action |
+| --- | --- |
+| **6 / Edit Spline** | Edit the active Bézier curve with Select active; isolates it when several objects are selected. |
+| **1 Vertex** | Edit anchors and drag their handle diamonds. |
+| **2 Segment** | Edit spans between anchors; a selection box includes any touched span. |
+| **3 Spline** | Edit one open or closed path within the active curve. |
+| Sidebar **All** | Select every path in the active curve object. |
+| **Q / W / E / R** | Select / Move / Rotate / Scale. |
+| **Shift-click** | Add or remove a component from the selection. |
+| **Right-click** while idle | Choose Corner, Smooth, Bézier, or Bézier Corner. |
+| **4 / Enter / Numpad Enter** | Return to Object Mode. |
+| **Esc** | Cancel a live drag; when idle in a Spline editing tool, exit editing. |
+| **Ctrl+Z** | Undo a completed edit. During drawing, remove the last preview point. |
+
+With one supported curve selected in Object Mode, **1**, **2**, or **3** also enters that level directly. Open the sidebar with **N** (Default keymap) or **Ctrl+]** (Industry Compatible). Vertex Scale changes tangent lengths; Vertex Rotate offers Group or Tangents. Use Object Mode for object transforms. [Full user guide](docs/USER_GUIDE.md)
 
 ## Features
 

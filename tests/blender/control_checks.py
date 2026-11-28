@@ -120,6 +120,9 @@ class Layout:
     def row(self, **kwargs):
         return self
 
+    def box(self):
+        return self
+
     def operator(self, name, **kwargs):
         op = SimpleNamespace(ui_kwargs=kwargs)
         self.operators.append((name, op))

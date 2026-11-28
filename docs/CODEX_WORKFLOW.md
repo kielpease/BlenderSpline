@@ -1,5 +1,7 @@
 # GitHub and Codex workflow
 
+The project now ships as Spline on [Blender Extensions](https://extensions.blender.org/add-ons/spline-maker/). Follow [Publishing Spline updates](RELEASING.md) for current versioning, acceptance, and distribution. The repository-creation and first-task prompts below are historical starter guidance.
+
 ## Create the repository
 
 1. Choose a name, suggested `blender-spline-maker`, and public/private visibility. Keep it private initially if you want to refine it before sharing.

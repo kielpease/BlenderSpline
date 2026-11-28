@@ -2,9 +2,11 @@
 
 This guide covers Spline 1.0.0, tested on Blender 5.2.4 LTS for Windows. The ZIP installs as **Spline** and uses the extension ID `spline_maker` for upgrades from earlier builds.
 
+Development build **1.1.0** adds Circle Sides/Roll and shaded sidebar boxes. This build is being checked on Blender **5.2.5 LTS for Windows** and is awaiting owner acceptance. The public 1.0.0 package does not include those new controls.
+
 ## Install or update
 
-Build `dist/spline-1.0.0.zip` from the repository. [Build instructions](BUILD.md#build-and-validate)
+Install the public release from [Blender Extensions](https://extensions.blender.org/add-ons/spline-maker/), or build the current development ZIP, `dist/spline-1.1.0.zip`, from this repository. [Build instructions](BUILD.md#build-and-validate)
 
 In Blender, open **Edit → Preferences → Get Extensions**. From the top-right menu, choose **Install from Disk** and select the ZIP. Enable **Spline** under **Add-ons** if needed. If Blender reports an already-registered class during an upgrade, restart and check the installed version under **Add-ons** before enabling it again.
 
@@ -63,6 +65,12 @@ With Industry Compatible, you can hold a gizmo drag and use the wheel to zoom or
 ## Make a profile
 
 Select a Bézier curve in Object Mode and enable **Make Profile** in the **Spline** sidebar. Start with **Rectangle** and set **Height**, **Width**, and **Roll**, or choose **Circle** and set **Radius**. **Curve Resolution** controls the number of samples on curved spans. The file remembers the last Rectangle height and width you enter for newly enabled profiles. On an older profile, **Update Profile Corners** applies the current corner handling.
+
+In **1.1.0**, Circle also offers **Sides**, an integer from **3 to 1024**, default **32**, and **Roll**, default **0°**. Sides counts edges around the cross-section: use 3 for a triangular tube, 4 for a square cross-section, or 100/128 and higher for a rounder sweep. Radius measures from the center to each corner. Curve Resolution still controls sampling along the path and is independent of Sides. Roll rotates the cross-section around the path; it is easiest to see on a low-sided polygon. Type an angle such as `30°` into Roll. Rectangle and Circle keep independent roll values when switching shapes.
+
+Profiles saved by earlier versions keep their existing graph and dimensions. Click **Update Profile** (the renamed Update Profile Corners action) to expose the new controls. The upgrade preserves Shape, Height, Width, Radius, and Rectangle Roll, starts Circle at 32 sides and 0° roll, and takes one Undo step. Sides and both roll settings are saved with each object's profile in the `.blend` file. The source stays a native editable Bézier curve.
+
+The Spline drawing/editing panels use Blender's shaded box background for separation from the viewport. Their exact shade follows your Blender theme; the extension does not change the theme shared by other panels.
 
 ## Save and reopen
 

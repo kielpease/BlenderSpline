@@ -313,6 +313,25 @@ Isolated viewport checks passed on Blender 5.2.4 LTS for Windows with Industry C
 
 ## Release gate
 
+### 1.1.0 Circle controls, sidebar contrast, and usage information — 2026-11-27
+
+- **Blender 5.2.5 LTS for Windows**, build `5f2fd03c4701`: source and ZIP extension validation passed; the full isolated background smoke suite passed. Profile checks cover 3, 4, 32, 100, 128, and 1024 sides, capped surface counts, radius preservation, 30° cross-section rotation, independent Rectangle/Circle Roll, unchanged native source geometry, off/on persistence, and legacy graph upgrades with Undo/Redo. The lifecycle round trip retains 128 sides and Circle Roll after save/reopen.
+- Real isolated **Default-keymap** viewport checks entered **Sides = 3** and **Roll = 30°** through the sidebar and observed the profile update. Ctrl+Z restored Roll to 0°, and native **Edit → Redo** restored 30°. Object Mode and Edit Spline shaded boxes were visibly darker than the viewport with **Blender Dark**. Edit Spline entry and the Object Mode button worked. A keyboard Redo attempt did not restore the intended step; Redo was verified through the menu, so physical Ctrl+Shift+Z priority remains unverified.
+- The Blender Extensions About text was saved through the signed-in editor and verified on the public page: drawing entry, finish/cancel behavior, component levels, Q/W/E/R, and editing exit are visible, including a rendered hotkey table. Source: `docs/EXTENSIONS_DESCRIPTION.md`. Existing media and published 1.0.0 were preserved. The new manifest declares **Add Curve**, **Modeling**, and **3D View**; these will reach the live listing with the candidate's version upload. Bézier is included in descriptive text because it is not a supported platform tag.
+- Candidate: `dist/spline-1.1.0.zip`, SHA256 `78cc2d82c18f167693466689e0560522ff22d548411d4f2570967e51614bfa8f` (verify against the asset before release). Release asset/source checks and all 11 synthetic release-tool checks passed.
+- **Owner acceptance is pending.** New controls have not been checked on Blender 5.2.4. Industry Compatible mouse entry, high-side-count UI input, alternate themes, physical Redo shortcut, and opening a real owner file with an old profile remain unverified for this candidate. The new ZIP has not been submitted to Blender Extensions or promoted to stable; API publishing and end-user update delivery remain pending the release process.
+- Owner check: install the candidate in a fresh profile; select a curve → **Make Profile → Circle**; try Sides 3/4/100/128 and Roll 0°/30°/90°; check Undo/Redo and save/reopen. Switch Rectangle/Circle to check independent rolls, use **Update Profile** on an older profile, and inspect sidebar contrast in Object and Edit Mode. Confirm acceptance before publishing.
+
+Public distribution also follows [Publishing Spline updates](RELEASING.md). Record the exact ZIP SHA256, owner acceptance, GitHub release/tag, platform upload/publication status, and an existing-installation update check in Blender for each release.
+
+### Release process tooling — 2026-11-27
+
+- Windows PowerShell 5.1 ran `powershell -NoProfile -ExecutionPolicy Bypass -File tests/release_checks.ps1`: **11 checks passed** against synthetic ZIP fixtures. Coverage includes a valid package/hash, mismatched and prerelease tags, wrong identity/version/metadata, missing license, duplicate/extra entries, and altered source bytes.
+- This is release-process verification only. No extension runtime code or manifest version changed. No Blender executable was found on PATH or in the usual Program Files installation directory on this laptop, so no Blender build, validation, background suite, or UI tests were run for this change.
+- Owner acceptance of the new process, GitHub-hosted workflow execution, repository secret configuration, a real API upload, and platform-to-Blender update delivery remain unverified. The existing published 1.0.0 was not uploaded again.
+
+### Blender release checklist
+
 Repeat the checks against the final release ZIP. Install in a clean Blender profile, then verify drawing from the Add menu and switching the sidebar between curves and meshes. Check edit entry and exit, transform and topology Undo/Redo, and live profile dimensions. Save and reopen the .blend. Exercise scene and active-object changes, deletion, undo through creation, and disable/re-enable. Confirm Blender restores its native tools and the extension removes its handlers, keymaps, menus, and overlays.
 
 ## Meaningful automated checks
